@@ -12,6 +12,9 @@
 
 import numpy as np
 
+################################################################################
+# Mutual information / Entropy calculation
+
 def _term(pxy, px, py):
     if px == 0 or py == 0 or pxy == 0:
         return 0
@@ -99,3 +102,57 @@ def test_binary_mutual_information(dataSet1, dataSet2):
             if not np.isclose([r1], [r2]):
                 return False
     return True
+
+################################################################################
+# Boolean functions.  All are designed to take and receive bools, not integers
+# (though it wouldn't take much to change that).
+
+# ~ 99 microseconds
+def dsAnd(x, y):
+    """Dataset AND.  For use with Pandas Series."""
+    return x.multiply(y).astype(bool)
+
+# ~ 192 microseconds (!)
+def dsOr(x, y):
+    """Dataset OR.  For use with Pandas Series."""
+    return ~(~x).multiply(~y)
+
+# ~ 59 microseconds
+def dsXor(x, y):
+    """Dataset XOR.  For use with Pandas Series."""
+    return x != y
+
+# ~ 99 + 46 = 145 microseconds
+def dsAndNot(x, y):
+    """Dataset x AND NOT y.  For use with Pandas Series."""
+    return dsAnd(x, ~y)
+
+# ~ 99 + 46 = 145 microseconds
+def dsNotAnd(x, y):
+    """Dataset NOT x AND y.  For use with Pandas Series."""
+    return dsAnd(~x, y)
+
+COMBINATIONS = [dsAnd, dsOr, dsXor, dsAndNot, dsNotAnd]
+
+def best_combination(d1, d2, p):
+    """Find the best boolean combination of d1 and d2 to relate to p.
+
+    Uses mutual information to find the best boolean function between d1 and d2
+    to relate to p.  Returns a two-tuple:
+
+    [0] the best boolean function
+    [1] the resulting dataset
+
+    """
+    best_mutual_info = 0
+    best_func = None
+    best_dataset = None
+
+    for func in COMBINATIONS:
+        dataset = func(d1, d2)
+        mutual_info = binary_mutual_information(dataset, p)
+        if mutual_info >= best_mutual_info:
+            best_mutual_info = mutual_info
+            best_func = func
+            best_dataset = dataset 
+    return best_func, best_dataset
