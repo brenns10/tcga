@@ -38,6 +38,25 @@ def mutations(filename):
         mutations.ix[patient, gene] = 1
     return mutations
 
-def phenotypes(filename, dtype=bool):
+def phenotypes(filename, dtype=None):
     """Reads a mutation CSV.  Returns a pd.Series indexed by patient."""
-    return pd.read_csv(filename, index_col=0, squeeze=True, dtype=dtype)
+    val = pd.read_csv(filename, index_col=0, squeeze=True)
+    if dtype:
+        return val.astype(dtype)
+    else:
+        return val
+
+def restrict(mutations, phenotypes):
+    """Restrict the patients to only those contained in both datasets.
+
+    Unfortunately, this copies the data in memory (I'm not sure why).  Returns a
+    2-tuple:
+
+    [0]: modified mutations dataframe
+    [1]: modified phenotypes dataframe
+
+    """
+    mutations = mutations.reindex(index=mutations.index.intersection(phenotypes.index))
+    phenotypes = phenotypes.reindex(index=mutations.index)
+    return mutations, phenotypes
+
