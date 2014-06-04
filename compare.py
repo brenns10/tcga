@@ -140,24 +140,28 @@ def best_combination(d1, d2, p):
     """Find the best boolean combination of d1 and d2 to relate to p.
 
     Uses mutual information to find the best boolean function between d1 and d2
-    to relate to p.  Returns a two-tuple:
+    to relate to p.  Returns a four-tuple:
 
     [0] the best boolean function
     [1] the resulting dataset
+    [2] the mutual information of this function
+    [3] the mustual information of the second function
 
     """
     best_mutual_info = 0
     best_func = None
     best_dataset = None
+    second_best_mutual_info = 0
 
     for func in COMBINATIONS:
         dataset = func(d1, d2)
         mutual_info = binary_mutual_information(dataset, p)
         if mutual_info >= best_mutual_info:
+            second_best_mutual_info = best_mutual_info
             best_mutual_info = mutual_info
             best_func = func
-            best_dataset = dataset 
-    return best_func, best_dataset
+            best_dataset = dataset
+    return best_func, best_dataset, best_mutual_info, second_best_mutual_info
 
 def test_best_combination(size, function, proportion):
     """Tests the best_combination function.
@@ -174,7 +178,7 @@ def test_best_combination(size, function, proportion):
     pattern = function(d1, d2)
     for i in range(int(proportion * size)):
         p[i] = pattern[i]
-    res_func, res_set = best_combination(d1, d2, p)
+    res_func, *etc = best_combination(d1, d2, p)
     return res_func == function
 
 def test_detection_rate(size, function, trials, start=0.3, step=0.01):
