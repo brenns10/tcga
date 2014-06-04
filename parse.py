@@ -38,6 +38,6 @@ def mutations(filename):
         mutations.ix[patient, gene] = 1
     return mutations
 
-def phenotype(filename, dtype=bool):
+def phenotypes(filename, dtype=bool):
     """Reads a mutation CSV.  Returns a pd.Series indexed by patient."""
     return pd.read_csv(filename, index_col=0, squeeze=True, dtype=dtype)
