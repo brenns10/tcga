@@ -11,6 +11,8 @@
 #-------------------------------------------------------------------------------
 
 import numpy as np
+import pandas as pd
+from pandas import Series, DataFrame
 
 ################################################################################
 # Mutual information / Entropy calculation
@@ -156,3 +158,51 @@ def best_combination(d1, d2, p):
             best_func = func
             best_dataset = dataset 
     return best_func, best_dataset
+
+def test_best_combination(size, function, proportion):
+    """Tests the best_combination function.
+
+    Creates three random binary datasets (two data, one phenotype) with given
+    size.  Adds the pattern from the given function for the given proportion of
+    samples.  Then, checks whether best_combination() picks the correct
+    function.  Returns True if it did, False otherwise.
+
+    """
+    d1 = Series(np.random.randint(0, 2, size)).astype(bool)
+    d2 = Series(np.random.randint(0, 2, size)).astype(bool)
+    p = Series(np.random.randint(0, 2, size)).astype(bool)
+    pattern = function(d1, d2)
+    for i in range(int(proportion * size)):
+        p[i] = pattern[i]
+    res_func, res_set = best_combination(d1, d2, p)
+    return res_func == function
+
+def test_detection_rate(size, function, trials, start=0.3, step=0.01):
+    """Finds the lowest proportion at which best_combination works.
+
+    Uses test_best_combination() on the given function and size.  Starts at 30%
+    pattern (by default) and moves down by 1% (by default).  Terminates when the
+    best combination is not found by every trials, and returns the failed
+    proportion.
+
+    """
+    curr = start
+    step = 0.01
+    detected = True
+    while detected:
+        for x in range(trials):
+            if not test_best_combination(size, function, curr):
+                detected = False
+        if detected:
+            curr -= step
+    return curr
+
+def test_all_detections(size, trials=5, out=False):
+    """Tests the detection rate for all functions."""
+    rates = []
+    for function in COMBINATIONS:
+        rate = test_detection_rate(size, function, trials)
+        if out:
+            print('%s  %f' % (function.__name__, rate))
+        rates.append(rate)
+    return rates
