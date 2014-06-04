@@ -201,11 +201,11 @@ def test_detection_rate(size, function, trials, start=0.3, step=0.01):
             curr -= step
     return curr
 
-def test_all_detections(size, trials=5, out=False):
+def test_all_detections(size, trials=5, start=0.3, step=0.01, out=False):
     """Tests the detection rate for all functions."""
     rates = []
     for function in COMBINATIONS:
-        rate = test_detection_rate(size, function, trials)
+        rate = test_detection_rate(size, function, trials, start=start, step=step)
         if out:
             print('%s  %f' % (function.__name__, rate))
         rates.append(rate)
