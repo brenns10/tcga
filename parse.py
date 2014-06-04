@@ -60,3 +60,8 @@ def restrict(mutations, phenotypes):
     phenotypes = phenotypes.reindex(index=mutations.index)
     return mutations, phenotypes
 
+def data(mutationsLoc, phenotypesLoc, phenotypesDType=None):
+    """Read both data files and restrict patients to those contained in both."""
+    muts = mutations(mutationsLoc)
+    phen = phenotypes(phenotypesLoc, phenotypesDType)
+    return restrict(muts, phen)
