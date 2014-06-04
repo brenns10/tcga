@@ -38,7 +38,7 @@ def mutations(filename):
         mutations.ix[patient, gene] = 1
     return mutations
 
-def phenotypes(filename, dtype=None):
+def phenotypes(filename, dtype=bool):
     """Reads a mutation CSV.  Returns a pd.Series indexed by patient."""
     val = pd.read_csv(filename, index_col=0, squeeze=True)
     if dtype:
@@ -60,7 +60,7 @@ def restrict(mutations, phenotypes):
     phenotypes = phenotypes.reindex(index=mutations.index)
     return mutations, phenotypes
 
-def data(mutationsLoc, phenotypesLoc, phenotypesDType=None):
+def data(mutationsLoc, phenotypesLoc, phenotypesDType=bool):
     """Read both data files and restrict patients to those contained in both."""
     muts = mutations(mutationsLoc)
     phen = phenotypes(phenotypesLoc, phenotypesDType)
