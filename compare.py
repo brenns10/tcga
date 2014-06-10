@@ -73,7 +73,7 @@ def conditional_entropy(dataSet, conditionSet, dsDomain=[0,1], csDomain=[0,1]):
                 entropy += pBoth * np.log2(pCondition / pBoth)
     return entropy
 
-def test_binary_mutual_information(dataSet1, dataSet2):
+def compare_mi_methods(dataSet1, dataSet2):
     """Computes binary mutual information multiple ways and compares.
 
     Uses the direct formula (binary_mutual_information()), as well as the
@@ -163,7 +163,10 @@ def best_combination(d1, d2, p):
             best_dataset = dataset
     return best_func, best_dataset, best_mutual_info, second_best_mutual_info
 
-def test_best_combination(size, function, proportion):
+################################################################################
+# Benchmarks for pattern detection
+
+def reclaim_pattern(size, function, proportion):
     """Tests the best_combination function.
 
     Creates three random binary datasets (two data, one phenotype) with given
@@ -181,10 +184,10 @@ def test_best_combination(size, function, proportion):
     res_func, *etc = best_combination(d1, d2, p)
     return res_func == function
 
-def test_detection_rate(size, function, trials, start=0.3, step=0.01):
+def pattern_detection_rate(size, function, trials, start=0.3, step=0.01):
     """Finds the lowest proportion at which best_combination works.
 
-    Uses test_best_combination() on the given function and size.  Starts at 30%
+    Uses reclaim_pattern() on the given function and size.  Starts at 30%
     pattern (by default) and moves down by 1% (by default).  Terminates when the
     best combination is not found by every trials, and returns the failed
     proportion.
@@ -195,13 +198,13 @@ def test_detection_rate(size, function, trials, start=0.3, step=0.01):
     detected = True
     while detected:
         for x in range(trials):
-            if not test_best_combination(size, function, curr):
+            if not reclaim_pattern(size, function, curr):
                 detected = False
         if detected:
             curr -= step
     return curr
 
-def test_all_detections(size, trials=5, start=0.3, step=0.01, out=False):
+def all_detection_rates(size, trials=5, start=0.3, step=0.01, out=False):
     """Tests the detection rate for all functions."""
     rates = []
     for function in COMBINATIONS:
