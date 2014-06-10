@@ -59,8 +59,8 @@ def randTree(muts, phen, depth, verbose=True, simplify=False):
     secondStr = muts.columns[next(choices)]
 
     # Creae sympy symbols from the gene names
-    firstSym = s.Symbol(firstStr)
-    secondSym = s.Symbol(secondStr)
+    firstSym = s.Symbol('['+firstStr+']')
+    secondSym = s.Symbol('['+secondStr+']')
 
     # Get the actual Series for each gene
     first = muts[firstStr]
@@ -83,7 +83,7 @@ def randTree(muts, phen, depth, verbose=True, simplify=False):
         currDataSet = muts[currStr]
         func, prev, mi1, mi2 = compare.best_combination(prev, currDataSet, phen)
         print("   Selecting %s, MI=%f, by margin of %f." % (func.__name__, mi1, mi1-mi2))
-        expr = DS_TO_SYM[func](expr, s.Symbol(currStr))
+        expr = DS_TO_SYM[func](expr, s.Symbol('['+currStr+']'))
 
     if simplify:
         expr = s.simplify_logic(expr, 'dnf')
