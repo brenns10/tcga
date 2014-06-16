@@ -16,6 +16,18 @@ Binary functions will be evaluated up the tree.
 - NumPy
 - SymPy
 
+## Unit Tests
+
+Unit tests are in tcga/test.py.  They can be run with the command:
+
+```
+#!bash
+$ python -m unittest tcga.test
+```
+
+You need to be in the same directory as this file in order to run the unit tests.  
+They will not run from inside the module.
+
 ## Important Functions
 
 This package is first and foremost a collection of functions, not a program.
