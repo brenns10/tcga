@@ -79,4 +79,4 @@ def sparse_mutations(filename, phenotype=None):
     if phenotype is not None:
         muts = [(gene, patient) for gene, patient in muts if patient in
                 phenotype.index]
-    return muts
+    return list(set(muts)) # no duplicates
