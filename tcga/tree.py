@@ -10,7 +10,7 @@
 #
 #-------------------------------------------------------------------------------
 
-from . import compare
+from . import compare, parse, util
 import random
 import sympy as s
 
@@ -91,3 +91,65 @@ def randTree(muts, phen, depth, verbose=True, simplify=False):
         print('Expression constructed:')
         s.pprint(expr)
     return expr
+
+@util.progress_bar(size_param=(2, 'niters', None))
+def rand_rectangle(mutations, sparse_mutations, niters=None):
+    """
+    An iterator that yields swappable rectangles from the mutations matrix.
+
+    In order to create a randomized matrix that retains the properties of the
+    original, we take the original matrix, and randomly choose two points
+    such that both are True, and the opposite corners of the rectangle they
+    form are False.  Graphically:
+
+    [ 1 .... 0 ]
+    [ .      . ]
+    [ .      . ]
+    [ 0 .... 1 ]
+
+    This function is an iterator that yields a certain number of these
+    rectangles, randomly selected.  Note that the parameters mutations and
+    sparse_mutations should be updated on every swap.  Thus, it isn't
+    advisable to do list(rand_rectangle(...)), as some of the later
+    rectangles might be affected by previous swaps.
+
+    :param mutations: The mutations DataFrame that we are randomizing.
+    :param sparse_mutations: A sparse representation of the mutations we are
+    randomizing, so we can quickly choose values which are True.
+    :param niters: The number of rectangles to yield.
+    :return: Tuple: (gene_1, patient_1, gene_2, patient_2).
+    """
+    import random
+    if niters is None:
+        niters = 4 * len(sparse_mutations)
+    yielded = 0
+    while yielded < niters:
+        idx1 = random.randrange(len(sparse_mutations))
+        idx2 = random.randrange(len(sparse_mutations))
+        gene_1, patient_1 = sparse_mutations[idx1]
+        gene_2, patient_2 = sparse_mutations[idx2]
+        if not (mutations[gene_1][patient_2] or mutations[gene_2][
+                patient_1]):
+            yield (idx1, idx2)
+            yielded += 1
+
+def randomize_mutations(mutations, mutations_path, num_iterations=None,
+                        phenotype=None):
+    new_mutations = mutations.copy()
+    sparse_mutations = parse.sparse_mutations(mutations_path,
+                                              phenotype=phenotype)
+    if num_iterations is None:
+        num_iterations = 4 * len(sparse_mutations)
+
+    for idx1, idx2 in rand_rectangle(new_mutations, sparse_mutations,
+                                     num_iterations):
+        gene_1, patient_1 = sparse_mutations[idx1]
+        gene_2, patient_2 = sparse_mutations[idx2]
+        new_mutations[gene_1][patient_2] = True
+        new_mutations[gene_2][patient_1] = True
+        new_mutations[gene_1][patient_1] = False
+        new_mutations[gene_2][patient_2] = False
+        del sparse_mutations[idx1]
+        del sparse_mutations[idx2-1]
+        sparse_mutations.append((gene_1, patient_2))
+        sparse_mutations.append((gene_2, patient_1))
