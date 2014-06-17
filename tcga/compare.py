@@ -301,7 +301,7 @@ def all_detection_rates(size, trials=5, start=0.3, step=0.01, dist=0.5,
     rates = []
     for function in COMBINATIONS:
         rate = pattern_detection_rate(size, function, trials, start=start,
-                                      step=step)
+                                      step=step, dist=dist)
         if out:
             print('%s  %f' % (function.__name__, rate))
         rates.append(rate)
