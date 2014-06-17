@@ -153,3 +153,4 @@ def randomize_mutations(mutations, mutations_path, num_iterations=None,
         del sparse_mutations[idx2-1]
         sparse_mutations.append((gene_1, patient_2))
         sparse_mutations.append((gene_2, patient_1))
+    return new_mutations
