@@ -43,21 +43,35 @@ def get_term_type():
     :return: Item of type TermType.
     """
     try:
+        # noinspection PyUnresolvedReferences
         import IPython
     except ImportError:
         return _non_ipy_term_type()
 
-    import IPython.terminal.interactiveshell as IPyIntShell
-    import IPython.kernel.zmq.zmqshell as IPyZMQShell
+    import IPython.terminal.interactiveshell as intshell
+    import IPython.kernel.zmq.zmqshell as zmqshell
     ipy = IPython.get_ipython()
     if ipy is None:
         return _non_ipy_term_type()
-    elif type(ipy) is IPyIntShell.TerminalInteractiveShell:
+    elif type(ipy) is intshell.TerminalInteractiveShell:
         return TermType.IPythonTerminal
-    elif type(ipy) is IPyZMQShell.ZMQInteractiveShell:
+    elif type(ipy) is zmqshell.ZMQInteractiveShell:
         return TermType.IPythonGUI
     else:
         return TermType.Unknown
+
+
+def _silent_format(string, params):
+    """
+    Attempt to format a string, and ignore any exceptions that occur.
+    :param string: String to format.
+    :param params: Formatting parameters.
+    :return: The formatted string, or the string parameter on error.
+    """
+    try:
+        return string % params
+    except TypeError:  # Not all arguments converted ...
+        return string
 
 
 class Progress:
@@ -132,18 +146,6 @@ class Progress:
             sys.stdout = StringIO()
             self.needswrite = True
 
-    def __silent_format(self, string, params):
-        """
-        Attempt to format a string, and ignore any exceptions that occur.
-        :param string: String to format.
-        :param params: Formatting parameters.
-        :return: The formatted string, or the string parameter on error.
-        """
-        try:
-            return string % params
-        except TypeError: # Not all arguments converted ...
-            return string
-
     def __progress(self):
         """
         Print the progress bar if it is necessary.
@@ -154,8 +156,8 @@ class Progress:
             msg = 'Unknown Progress'
             self.stdout.write('\r' + msg + ' '*(self.width-len(msg)))
         elif newpercent != self.percent or self.needswrite:
-            prefix = self.__silent_format(self.prefix, newpercent)
-            suffix = self.__silent_format(self.suffix, newpercent)
+            prefix = _silent_format(self.prefix, newpercent)
+            suffix = _silent_format(self.suffix, newpercent)
             navailable = self.width - len(prefix) - len(suffix)
             nblocks = int((self.iters / self.estimate) * navailable)
             self.stdout.write('\r' + prefix + self.block * nblocks + ' '*(
@@ -205,6 +207,7 @@ def progress(it, *args, **kwargs):
         return Progress(it, *args, **kwargs)
     else:
         return it
+
 
 def progress_bar(size_param=(None, 'niters', 100)):
     """
