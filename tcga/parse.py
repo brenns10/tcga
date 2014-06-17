@@ -65,3 +65,18 @@ def data(mutationsLoc, phenotypesLoc, phenotypesDType=bool):
     muts = mutations(mutationsLoc)
     phen = phenotypes(phenotypesLoc, phenotypesDType)
     return restrict(muts, phen)
+
+def sparse_mutations(filename, phenotype=None):
+    """
+    Reads the sparse mutations, and returns a list of (gene, patient) tuples.
+    Restricts to only the patients included in the phenotype index,
+    if phenotype is provided.
+    :param filename: The filename of the mutations csv file.
+    :param phenotype: The phenotype Series.
+    :return: A Python list of (gene, patient) tuples.
+    """
+    muts = list(_read_csv(filename))
+    if phenotype is not None:
+        muts = [(gene, patient) for gene, patient in muts if patient in
+                phenotype.index]
+    return muts
