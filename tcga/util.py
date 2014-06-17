@@ -13,7 +13,52 @@
 __author__ = 'Stephen Brennan <stephen.brennan@case.edu>'
 
 from io import StringIO
+from enum import Enum
 import sys
+
+
+class TermType(Enum):
+    TTY = 1
+    IPythonTerminal = 2
+    IPythonGUI = 3
+    File = 4
+    Unknown = 0
+
+
+def _non_ipy_term_type():
+    """
+    The terminal type of a non-IPython terminal.
+    :return: Item of type TermType.
+    """
+    import sys
+    if sys.stdout.isatty():
+        return TermType.TTY
+    else:
+        return TermType.File
+
+
+def get_term_type():
+    """
+    Identifies the type of terminal the current Python instance is running in.
+    :return: Item of type TermType.
+    """
+    try:
+        import IPython
+    except ImportError:
+        return _non_ipy_term_type()
+
+    import IPython.terminal.interactiveshell as IPyIntShell
+    import IPython.kernel.zmq.zmqshell as IPyZMQShell
+    ipy = IPython.get_ipython()
+    if ipy is None:
+        return _non_ipy_term_type()
+    elif type(ipy) is IPyIntShell.TerminalInteractiveShell:
+        return TermType.IPythonTerminal
+    elif type(ipy) is IPyZMQShell.ZMQInteractiveShell:
+        return TermType.IPythonGUI
+    else:
+        return TermType.Unknown
+
 
 class Progress:
     """
@@ -143,6 +188,24 @@ class Progress:
             # End the iteration
             raise StopIteration
 
+
+def progress(it, *args, **kwargs):
+    """
+    Returns a progress bar if terminal is capable.
+
+    See docstrings for Progress for more information on the other arguments.
+
+    :param it: The iterator/list/range.
+    :param args: Other positional arguments.
+    :param kwargs: Other keyword arguments.
+    :return:
+    """
+    termtype = get_term_type()
+    if termtype == TermType.TTY or termtype == TermType.IPythonTerminal:
+        return Progress(it, *args, **kwargs)
+    else:
+        return it
+
 def progress_bar(size_param=(None, 'niters', 100)):
     """
     Turns a generator function into an iterator that uses Progress.
@@ -180,6 +243,6 @@ def progress_bar(size_param=(None, 'niters', 100)):
                 niters = kwargs[size_param[1]]
             elif size_param[0] is not None and size_param[0] < len(args):
                 niters = args[size_param[0]]
-            return Progress(f(*args, **kwargs), niters=niters)
+            return progress(f(*args, **kwargs), niters=niters)
         return wrapped_f
     return wrap
