@@ -11,7 +11,6 @@
 #-------------------------------------------------------------------------------
 
 import numpy as np
-import pandas as pd
 from pandas import Series, DataFrame
 
 ################################################################################
@@ -59,10 +58,8 @@ def binary_mutual_information(ds1, ds2):
     py1 = px0y1 + px1y1
     py0 = 1 - py1
 
-    mutual_information = _term(px1y1, px1, py1) \
-                         + _term(px1y0, px1, py0) \
-                         + _term(px0y1, px0, py1) \
-                         + _term(px0y0, px0, py0)
+    mutual_information = _term(px1y1, px1, py1) + _term(px1y0, px1, py0) + \
+        _term(px0y1, px0, py1) + _term(px0y0, px0, py0)
     return mutual_information
 
 
@@ -74,13 +71,13 @@ def entropy(ds, domain=(0, 1)):
     :param domain: The domain of the dataset.
     :return: The entropy of the dataset, in bits.
     """
-    entropy = 0
+    currentropy = 0
     total = len(ds)
     for value in domain:
         probability = len(ds[ds == value]) / total
         if probability != 0:  # avoid log(0)
-            entropy -= probability * np.log2(probability)
-    return entropy
+            currentropy -= probability * np.log2(probability)
+    return currentropy
 
 
 def conditional_entropy(ds, cs, ds_domain=(0, 1), cs_domain=(0, 1)):
@@ -93,19 +90,20 @@ def conditional_entropy(ds, cs, ds_domain=(0, 1), cs_domain=(0, 1)):
     :param cs_domain: The domain of the conditioned dataset.
     :return: The conditional entropy of ds given cs, AKA H(ds|cs), in bits.
     """
-    entropy = 0
+    currentropy = 0
     total = len(ds)
     for d in ds_domain:
         for c in cs_domain:
-            pBoth = len(ds[(ds == d) & (cs == c)]) / total
-            pCondition = len(cs[cs == c]) / total
-            if pCondition != 0:  # if pCondition == 0, pBoth == 0 too
-                entropy += pBoth * np.log2(pCondition / pBoth)
-    return entropy
+            pboth = len(ds[(ds == d) & (cs == c)]) / total
+            pcondition = len(cs[cs == c]) / total
+            if pcondition != 0:  # if pcondition == 0, pboth == 0 too
+                currentropy += pboth * np.log2(pcondition / pboth)
+    return currentropy
 
 
 def compare_mi_methods(ds1, ds2):
-    """Computes binary mutual information multiple ways and compares.
+    """
+    Computes binary mutual information multiple ways and compares.
 
     Uses the direct formula (binary_mutual_information()), as well as the
     following formulas which use entropy:
@@ -145,36 +143,36 @@ def compare_mi_methods(ds1, ds2):
 # (though it wouldn't take much to change that).
 
 # ~ 99 microseconds
-def dsAnd(x, y):
+def ds_and(x, y):
     """Dataset AND.  For use with Pandas Series."""
     return x.multiply(y).astype(bool)
 
 
 # ~ 192 microseconds (!)
-def dsOr(x, y):
+def ds_or(x, y):
     """Dataset OR.  For use with Pandas Series."""
     return ~(~x).multiply(~y)
 
 
 # ~ 59 microseconds
-def dsXor(x, y):
+def ds_xor(x, y):
     """Dataset XOR.  For use with Pandas Series."""
     return x != y
 
 
 # ~ 99 + 46 = 145 microseconds
-def dsAndNot(x, y):
+def ds_and_not(x, y):
     """Dataset x AND NOT y.  For use with Pandas Series."""
-    return dsAnd(x, ~y)
+    return ds_and(x, ~y)
 
 
 # ~ 99 + 46 = 145 microseconds
-def dsNotAnd(x, y):
+def ds_not_and(x, y):
     """Dataset NOT x AND y.  For use with Pandas Series."""
-    return dsAnd(~x, y)
+    return ds_and(~x, y)
 
 
-COMBINATIONS = [dsAnd, dsOr, dsXor, dsAndNot, dsNotAnd]
+COMBINATIONS = [ds_and, ds_or, ds_xor, ds_and_not, ds_not_and]
 
 
 def best_combination(d1, d2, p):

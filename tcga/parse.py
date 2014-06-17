@@ -14,12 +14,14 @@ import csv
 import numpy as np
 import pandas as pd
 
+
 def _read_csv(filename):
     """Reads a CSV file, skipping header. Returns tuples containing each row."""
     with open(filename) as f:
         r = csv.reader(f)
         next(r)
         yield from r
+
 
 def mutations(filename):
     """Reads a sparse mutation file.  Returns a dense Pandas DataFrame.
@@ -29,14 +31,15 @@ def mutations(filename):
 
     """
     raw_muts = list(_read_csv(filename))
-    genes, patients = zip(*raw_muts) # unzip the zipped lists
+    genes, patients = zip(*raw_muts)  # unzip the zipped lists
     genes = set(genes)
     patients = set(patients)
-    mutations = pd.DataFrame(np.zeros((len(patients), len(genes))), 
-                             index=patients, columns=genes, dtype=bool)
+    muts = pd.DataFrame(np.zeros((len(patients), len(genes))),
+                        index=patients, columns=genes, dtype=bool)
     for gene, patient in raw_muts:
-        mutations.ix[patient, gene] = 1
-    return mutations
+        muts.ix[patient, gene] = 1
+    return muts
+
 
 def phenotypes(filename, dtype=bool):
     """Reads a mutation CSV.  Returns a pd.Series indexed by patient."""
@@ -46,7 +49,8 @@ def phenotypes(filename, dtype=bool):
     else:
         return val
 
-def restrict(mutations, phenotypes):
+
+def restrict(muts, phen):
     """Restrict the patients to only those contained in both datasets.
 
     Unfortunately, this copies the data in memory (I'm not sure why).  Returns a
@@ -56,15 +60,17 @@ def restrict(mutations, phenotypes):
     [1]: modified phenotypes dataframe
 
     """
-    mutations = mutations.reindex(index=mutations.index.intersection(phenotypes.index))
-    phenotypes = phenotypes.reindex(index=mutations.index)
-    return mutations, phenotypes
+    muts = muts.reindex(index=muts.index.intersection(phen.index))
+    phen = phen.reindex(index=muts.index)
+    return muts, phen
 
-def data(mutationsLoc, phenotypesLoc, phenotypesDType=bool):
+
+def data(mutationsloc, phenotypesloc, phenotypesdtype=bool):
     """Read both data files and restrict patients to those contained in both."""
-    muts = mutations(mutationsLoc)
-    phen = phenotypes(phenotypesLoc, phenotypesDType)
+    muts = mutations(mutationsloc)
+    phen = phenotypes(phenotypesloc, phenotypesdtype)
     return restrict(muts, phen)
+
 
 def sparse_mutations(filename, phenotype=None):
     """
