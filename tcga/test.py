@@ -15,7 +15,24 @@ import unittest
 import numpy as np
 from pandas import Series
 
-from . import compare
+# Hackish import system!  Run tests anywhere!
+try:
+    # Relative package imports are used when running python -m unittest from
+    # the repository root.
+    from . import compare
+
+except SystemError:
+    try:
+        # Absolute package imports are used when running unit tests from
+        # PyCharm IDE.
+        from tcga import compare
+
+    except ImportError:
+        # Straight module imports are used when running:
+        #   python -m unittest from the inner tcga directory
+        #   python tcga/test.py
+        #   python test.py
+        import compare
 
 
 class TestMutualInfo(unittest.TestCase):
