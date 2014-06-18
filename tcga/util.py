@@ -53,9 +53,9 @@ def get_term_type():
     ipy = IPython.get_ipython()
     if ipy is None:
         return _non_ipy_term_type()
-    elif type(ipy) is intshell.TerminalInteractiveShell:
+    elif isinstance(ipy, intshell.TerminalInteractiveShell):
         return TermType.IPythonTerminal
-    elif type(ipy) is zmqshell.ZMQInteractiveShell:
+    elif isinstance(ipy, zmqshell.ZMQInteractiveShell):
         return TermType.IPythonGUI
     else:
         return TermType.Unknown
