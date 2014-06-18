@@ -10,9 +10,11 @@
 #
 #-------------------------------------------------------------------------------
 
-from . import compare, parse, util
 import random
+
 import sympy as s
+
+from . import compare, parse, util
 
 
 # These are functions that take expressions and combine them using whatever
