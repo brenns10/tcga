@@ -50,7 +50,7 @@ def binary_mutual_information(ds1, ds2):
     px1y1 = len(ds1[(ds1 == 1) & (ds2 == 1)]) / size
     px1y0 = len(ds1[(ds1 == 1) & (ds2 == 0)]) / size
     px0y1 = len(ds1[(ds1 == 0) & (ds2 == 1)]) / size
-    px0y0 = 1 - px1y1 - px1y0 - px0y1
+    px0y0 = len(ds1[(ds1 == 0) & (ds2 == 0)]) / size
 
     # p(x=1), p(y=1)
     px1 = px1y1 + px1y0
@@ -96,7 +96,7 @@ def conditional_entropy(ds, cs, ds_domain=(0, 1), cs_domain=(0, 1)):
         for c in cs_domain:
             pboth = len(ds[(ds == d) & (cs == c)]) / total
             pcondition = len(cs[cs == c]) / total
-            if pcondition != 0:  # if pcondition == 0, pboth == 0 too
+            if pboth != 0:
                 currentropy += pboth * np.log2(pcondition / pboth)
     return currentropy
 

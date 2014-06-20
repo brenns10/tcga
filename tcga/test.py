@@ -52,6 +52,37 @@ class TestMutualInfo(unittest.TestCase):
         self.assertEqual(compare.binary_mutual_information(basis,
                                                            no_mutual_info), 0)
 
+    def _get_binary_dataset(self, size, index):
+        """
+        Creates a binary dataset from an "index".
+
+        It's basically a list of booleans from the binary representation of
+        the index.
+
+        :param size: Number of bools in the dataset.
+        :param index: The index of the dataset (from 0 to 2^size - 1).
+        """
+        ds = [False] * size
+        for idx in range(size):
+            ds[idx] = index % 2 == 1
+            index //= 2
+        return Series(ds)
+
+    def test_compare_methods(self):
+        """
+        Tests all mutual information methods to ensure uniformity.
+
+        For all combinations of X-length binary datasets, ensures that all
+        five mutual information functions return similar results.
+        """
+        size = 5
+        for x in range(2**size):
+            ds1 = self._get_binary_dataset(size, x)
+            for y in range(x, 2**size):
+                ds2 = self._get_binary_dataset(size, y)
+                self.assertTrue(compare.compare_mi_methods(ds1, ds2),
+                                ''.join(['X:', str(x), ', Y:', str(y)]))
+
 
 class TestEntropy(unittest.TestCase):
 
@@ -79,6 +110,19 @@ class TestEntropy(unittest.TestCase):
                                    [0.81127812445913283]))
         self.assertTrue(np.isclose([compare.entropy(dataset2)],
                                    [0.81127812445913283]))
+
+
+class TestBestCombination(unittest.TestCase):
+
+    def test_simple(self):
+        """Tests that best_combination() can identify a complete pattern."""
+        ds1 = Series([False, False, True, True])
+        ds2 = Series([False, True, False, True])
+
+        for logic_func in compare.COMBINATIONS:
+            phenotype = logic_func(ds1, ds2)
+            best_func, *etc = compare.best_combination(ds1, ds2, phenotype)
+            self.assertEqual(logic_func, best_func)
 
 if __name__ == '__main__':
     unittest.main()
