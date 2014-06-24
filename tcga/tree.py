@@ -13,6 +13,7 @@
 import random
 
 import sympy as s
+from pandas import DataFrame
 
 from . import compare, parse, util
 
@@ -154,10 +155,19 @@ def rand_rectangle(mutations, sparse_mutations, niters=None):
             yielded += 1
 
 
-def randomize_mutations(mutations, mutations_path, num_iterations=None,
-                        phenotype=None):
+def randomize_mutations(mutations, mutationsloc=parse.MUTSLOC,
+                        num_iterations=None, phenotype=None):
+    """
+    Perform random swaps on mutation data until it is randomized.
+
+    :param mutations: Mutations dataset.
+    :param mutationsloc: location of the mutations CSV
+    :param num_iterations: Number of swaps to make.
+    :param phenotype: Phenotype dataset.
+    :return: Randomized dataset.
+    """
     new_mutations = mutations.copy()
-    sparse_mutations = parse.sparse_mutations(mutations_path,
+    sparse_mutations = parse.sparse_mutations(filename=mutationsloc,
                                               phenotype=phenotype)
     if num_iterations is None:
         num_iterations = 4 * len(sparse_mutations)
@@ -175,3 +185,68 @@ def randomize_mutations(mutations, mutations_path, num_iterations=None,
         sparse_mutations.append((gene_1, patient_2))
         sparse_mutations.append((gene_2, patient_1))
     return new_mutations
+
+
+def greedy_tree(muts, phen, copy=True, out=True):
+    """
+    Greedily construct a tree from the mutations dataset.
+
+    Treats the mutation dataset as a pool of root nodes to connect.  Chooses
+    the pair of nodes with the highest mutual info and combines them,
+    creating a new node and removing those two.
+
+    :param muts: The mutations dataset.
+    :param phen: The phenotype dataset.
+    :param copy: True if we copy muts before modifying.
+    :return:
+    """
+    if copy:
+        if out:
+            print('Copying mutation data...')
+        muts = muts.copy()
+
+    # Create gene x gene matrices to store mutual info and functions.  The
+    # matrices should be triangular, like this:
+    #
+    #      0   1   2   3
+    # 0  [ na  na  na  na ]
+    # 1  [ xx  na  na  na ]
+    # 2  [ xx  xx  na  na ]
+    # 3  [ xx  xx  xx  na ]
+    #
+    if out:
+        print('Creating storage matrices...')
+    mutual_info = DataFrame(index=muts.columns, columns=muts.columns,
+                            dtype=float)
+    best_function = DataFrame(index=muts.columns, columns=muts.columns,
+                              dtype='object')
+
+    # Populate matrices
+    if out:
+        print('Populating matrices...')
+    for gene1idx in range(len(mutual_info.index)):  # iterate by row
+        gene1 = mutual_info.index[gene1idx]
+
+        for gene2idx in range(gene1idx):  # column
+            gene2 = mutual_info.columns[gene2idx]
+
+            func, dataset, info, *etc = compare.best_combination(muts[gene1],
+                                                                 muts[gene2],
+                                                                 phen)
+            mutual_info[gene2][gene1] = info
+            best_function[gene2][gene1] = func
+            if out:
+                print('(%s, %s): %s (%f)' % (gene1, gene2, func.__name__, info))
+
+    # Repeat until we have only one (root) node:
+
+    # Retrieve max.
+    max_mi = mutual_info.max(axis=0).max()
+    if out:
+        print(max_mi)
+
+    # Create a new node with the two max-MI nodes.
+    # Remove the two nodes from the data set.
+    # Calculate mutual information between new node and the others, add to set.
+
+    # Finally, output tree.
