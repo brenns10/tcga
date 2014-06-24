@@ -3,11 +3,11 @@
 #
 # File:         run.py
 #
-# Author:       Stephen Brennan, Matthew Ruffalo
+# Author:       Stephen Brennan
 #
 # Date Created: Tuesday, 24 June 2014
 #
-# Description:  Contains functions for parsing TCGA data.
+# Description:  Contains menu for running various tasks in the TCGA package.
 #
 #-------------------------------------------------------------------------------
 
