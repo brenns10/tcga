@@ -13,6 +13,8 @@
 import numpy as np
 from pandas import Series, DataFrame
 
+from .util import progress
+
 ################################################################################
 # Mutual information / Entropy calculation
 
@@ -307,7 +309,7 @@ def all_detection_rates(size, trials=5, start=0.3, step=0.01, dist=0.5,
 
 
 def collect_detection_data(size_start=500, size_end=2000, size_step=250,
-                           runs_per_step=25, out=True):
+                           runs_per_step=25):
     """
     Collect data on the detection rate by the size of the dataset.
 
@@ -321,16 +323,14 @@ def collect_detection_data(size_start=500, size_end=2000, size_step=250,
     data = DataFrame(columns=['size'] +
                              [f.__name__ for f in COMBINATIONS],
                      dtype=float)
-    for size in range(size_start, size_end + 1, size_step):
-        if out:
-            print('=> Dataset size %d.' % size)
+    for size in progress(range(size_start, size_end + 1, size_step)):
         for x in range(runs_per_step):
             data.loc[len(data)] = [size] + all_detection_rates(size, trials=1)
     return data
 
 
 def detection_by_distribution(dist_start=0.05, dist_end=1.00, dist_step=0.05,
-                              runs_per_step=25, size=1000, out=True):
+                              runs_per_step=25, size=1000):
     """
     Collect data on the detection rate by the distribution of the dataset.
 
@@ -340,16 +340,11 @@ def detection_by_distribution(dist_start=0.05, dist_end=1.00, dist_step=0.05,
     :param runs_per_step: Number of times to run all_detection_rates() on
     each dist step.
     :param size: The size to test at.
-    :param out: Whether to output progress.
     :return: A DataFrame with data for each dist x function combination.
     """
     data = DataFrame(columns=['P(1)'] + [f.__name__ for f in COMBINATIONS],
                      dtype=float)
-    dist = dist_start
-    while dist < dist_end:
-        if out:
-            print('=> Distribution: %f.' % dist)
+    for dist in progress(range(dist_start, dist_end, dist_step)):
         for x in range(runs_per_step):
             data.loc[len(data)] = [dist] + all_detection_rates(size, dist=dist)
-        dist += dist_step
     return data
