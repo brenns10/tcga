@@ -10,6 +10,7 @@
 #
 #-------------------------------------------------------------------------------
 
+import random
 import numpy as np
 from pandas import Series, DataFrame
 
@@ -17,52 +18,6 @@ from .util import progress
 
 ################################################################################
 # Mutual information / Entropy calculation
-
-
-def _term(pxy, px, py):
-    """
-    Computes a 'term' in the binary_mutual_information() function.
-
-    :param pxy: P(X,Y)
-    :param px: P(X)
-    :param py: P(Y)
-    :return: P(X,Y) * log(P(X,Y)/(P(X)P(Y))), or 0 if the log is undefined.
-    """
-    if px == 0 or py == 0 or pxy == 0:
-        return 0
-    else:
-        return pxy * np.log2(pxy / (px * py))
-
-
-def binary_mutual_information(ds1, ds2):
-    """
-    Computes the mutual information (in bits) of two binary datasets.
-
-    Uses the formula I(X;Y) = Sum[y,x] (p(x,y)log(p(x,y)/(p(x)p(y)))).  This
-    isn't really the most intuitive formula for mutual information, in my mind.
-    However, it seems simplest to implement.
-
-    :param ds1: The first dataset to compute mutual information on.
-    :param ds2: The second dataset to compute mutual information on.
-    :return: The mutual information of ds1 and ds2.
-    """
-    size = len(ds1)
-
-    # p(x=1, y=1), p(x=1, y=0), p(x=0, y=1)
-    px1y1 = len(ds1[(ds1 == 1) & (ds2 == 1)]) / size
-    px1y0 = len(ds1[(ds1 == 1) & (ds2 == 0)]) / size
-    px0y1 = len(ds1[(ds1 == 0) & (ds2 == 1)]) / size
-    px0y0 = len(ds1[(ds1 == 0) & (ds2 == 0)]) / size
-
-    # p(x=1), p(y=1)
-    px1 = px1y1 + px1y0
-    px0 = 1 - px1
-    py1 = px0y1 + px1y1
-    py0 = 1 - py1
-
-    mutual_information = _term(px1y1, px1, py1) + _term(px1y0, px1, py0) + \
-        _term(px0y1, px0, py1) + _term(px0y0, px0, py0)
-    return mutual_information
 
 
 def entropy(ds, domain=(0, 1)):
@@ -103,6 +58,24 @@ def conditional_entropy(ds, cs, ds_domain=(0, 1), cs_domain=(0, 1)):
     return currentropy
 
 
+def mutual_info(ds1, ds2, ds1domain=2, ds2domain=2):
+    """
+    Calculate the mutual information between two datasets.  These two datasets
+    should be integer datasets in the range [0,domain).
+
+    :param ds1: First dataset, NumPy Series
+    :param ds2: Second dataset, NumPy Series
+    :param ds1domain: Integer domain of first dataset: x is in [0,ds1domain)
+    for all x in ds1.
+    :param ds2domain: Integer domain of second dataset: x is in [0,ds2domain)
+    for all x in ds1.
+    :return: The mutual information between the two datasets.
+    """
+    combined = ds1 + ds2 * ds1domain
+    return entropy(ds1) + entropy(ds2) - entropy(combined, domain=range(
+        ds1domain * ds2domain))
+
+
 def compare_mi_methods(ds1, ds2):
     """
     Computes binary mutual information multiple ways and compares.
@@ -122,16 +95,13 @@ def compare_mi_methods(ds1, ds2):
     """
     combined = ds1 + ds2 * 2
     results = [
-        binary_mutual_information(ds1, ds2),
-
         entropy(ds1) - conditional_entropy(ds1, ds2),
 
         entropy(ds2) - conditional_entropy(ds2, ds1),
 
         entropy(ds1) + entropy(ds2) - entropy(combined, domain=[0, 1, 2, 3]),
 
-        entropy(combined, domain=[0, 1, 2, 3]) - conditional_entropy(ds1, ds2)
-        - conditional_entropy(ds2, ds1),
+        mutual_info(ds1, ds2)
     ]
     for r1 in results:
         for r2 in results:
@@ -201,10 +171,10 @@ def best_combination(d1, d2, p):
 
     for func in COMBINATIONS:
         dataset = func(d1, d2)
-        mutual_info = binary_mutual_information(dataset, p)
-        if mutual_info >= best_mutual_info:
+        mi = mutual_info(dataset, p)
+        if mi >= best_mutual_info:
             second_best_mutual_info = best_mutual_info
-            best_mutual_info = mutual_info
+            best_mutual_info = mi
             best_func = func
             best_dataset = dataset
     return best_func, best_dataset, best_mutual_info, second_best_mutual_info
@@ -213,7 +183,7 @@ def best_combination(d1, d2, p):
 ################################################################################
 # Benchmarks for pattern detection
 
-def _binary_distribution(size, dist):
+def binary_distribution(size, dist):
     """
     Generate a boolean dataset of a particular size specified probability.
 
@@ -225,6 +195,23 @@ def _binary_distribution(size, dist):
     ds[ds < dist] = 1
     ds[ds != 1] = 0
     return ds.astype(bool)
+
+
+def implant_pattern(d1, d2, phenotype, function, proportion):
+    """
+    Randomly implant a pattern f(d1, d2) into a dataset at a given proportion.
+    :param d1: First dataset
+    :param d2: Second dataset
+    :param phenotype: The dataset to implant into
+    :param function: The pattern function
+    :param proportion: The proportion to implant at
+    :return:
+    """
+    pattern = function(d1, d2)
+    total = len(phenotype)
+    amount = int(proportion * total)
+    for i in random.sample(range(total), amount):
+        phenotype[i] = pattern[i]
 
 
 def reclaim_pattern(size, function, proportion, dist=0.5):
@@ -241,12 +228,10 @@ def reclaim_pattern(size, function, proportion, dist=0.5):
     :param proportion: The proportion of the data to implant the pattern into.
     :param dist: The probability of a 1 for the random dataset generation.
     """
-    d1 = _binary_distribution(size, dist)
-    d2 = _binary_distribution(size, dist)
-    p = _binary_distribution(size, dist)
-    pattern = function(d1, d2)
-    for i in range(int(proportion * size)):
-        p[i] = pattern[i]
+    d1 = binary_distribution(size, dist)
+    d2 = binary_distribution(size, dist)
+    p = binary_distribution(size, dist)
+    implant_pattern(d1, d2, p, function, proportion)
     res_func, *etc = best_combination(d1, d2, p)
     return res_func == function
 
