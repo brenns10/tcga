@@ -30,15 +30,43 @@ def _dataframe_append(dataframe, rowdict):
 
 
 class DetectionExperiment:
+    """
+    This class encapsulates an experiment to learn more about the detection
+    of various patterns implanted at various proportions into datasets of
+    various distributions.  This can be done at various 'degrees' (that is,
+    lengths of datasets).  In other words, there are many possible
+    combinations of parameters this experiment could run at.  This class
+    helps eliminate deep nested for-loops and long function chains that make
+    custimizing parameter ranges difficult or impossible.
 
-    def __init__(self, savedir):
+    It divides the experiment into 'configurations'.  A single configuration
+    is a single set of possible parameter values.  A configuration has a task
+    that should be run with those parameters (self.run_config()).
+    Configuration tasks are run with parameter values and return rows to be
+    added to the result DataFrame(s).
+
+    In the DetectionExperiment, a configuration is a value for:
+    - Degree (number of items in dataset)
+    - Distribution (P(1) in each dataset)
+    - Proportion (% of phenotype items to overwrite with pattern value)
+    The configuration task attempts to reclaim an imprinted pattern
+    self.TRIALS_PER_CONFIG times for each function.  It returns information
+    about false positives and negatives, and about the mutual information.
+
+    Configurations are runnable in parallel with the multiprocessing module.  I
+    may add a serial running option (for some reason).  I may also spin out
+    the machinery behind the basic experiment framework into a parent class.
+    """
+
+    def __init__(self):
+        """
+        Set up a detection experiment with default values.
+        """
         self.degrees = [500, 1000, 1500]
         self.distributions = list(np.arange(0.05, 0.51, 0.05))
         self.proportions = list(np.arange(0.3, 0.0, -0.01))
         self.TRIALS_PER_CONFIG = 50
         self.configuration_columns = ['Degree', 'Distribution', 'Proportion']
-
-        self.savedir = os.path.expandvars(os.path.expanduser(savedir))
 
         # Define the column for the detection dataset.
         detection_columns = list(self.configuration_columns)
@@ -62,6 +90,21 @@ class DetectionExperiment:
         self.mutual_info_results = DataFrame(columns=mi_columns)
 
     def run_trial(self, configuration, function):
+        """
+        Run a single trial of the configuration task, with the given function.
+
+        This is basically an enhanced tcga.compare.reclaim_pattern,
+        which returns all the mutual information values, the reclaimed
+        function, and the mutual info between the joint distribution and the
+        phenotype.
+        :param configuration: The experiment configuration.
+        :param function: The pattern function.
+        :return: Tuple:
+          [0]: dict: function -> mutual information
+          [1]: function: The function with the maximum mutual information.
+          [2]: The mutual information etween the joint distribution and the
+          phenotype.
+        """
         degree, distribution, proportion = configuration
 
         # Create three random datasets:
@@ -93,6 +136,13 @@ class DetectionExperiment:
         return mutual_info, max_f, joint_mutual_info
 
     def run_config(self, configuration):
+        """
+        Run a single configuration.
+        :param configuration: The configuration parameters.
+        :return: Tuple:
+         [0]: dict: Row to add to the detection dataset.
+         [1]: list of dict: Rows to add to the mutual information dataset.
+        """
         # Setup result dictionaries
         implant = {f: 0 for f in compare.COMBINATIONS}
         ident = {f: 0 for f in compare.COMBINATIONS}
@@ -151,12 +201,32 @@ class DetectionExperiment:
         return detection_row, mi_rows
 
     def run_config_wrapped(self, configuration):
+        """
+        Provides decent error handling in the multiprocessing module.
+
+        Since the multiprocessing module doesn't really allow you to get
+        things like stack traces from exceptions, this function wraps the
+        run_config() function, and at catches all exceptions, adding a
+        traceback in text form, so that error callback function can display
+        the traceback.
+        :param configuration: Passed to run_config()
+        :return: Return from run_config()
+        """
         try:
             return self.run_config(configuration)
         except Exception:
             raise Exception("".join(traceback.format_exc()))
 
     def experiment_callback(self, retVal):
+        """
+        Store data produced by run_config().
+
+        This function is called by the multiprocessing module when a task is
+        completed.  It is executed on the main process, so no synchronization is
+        needed to access the DataFrame.
+        :param retVal: Value returned by run_config().
+        :return:
+        """
         detection_row, mi_rows = retVal
         _dataframe_append(self.detection_results, detection_row)
         for row in mi_rows:
@@ -165,9 +235,31 @@ class DetectionExperiment:
         print('Completed %d of %d.' % (self.completed, self.nconfigs))
 
     def errcb(self, exception):
+        """
+        Error callback for multiprocessing.
+
+        This function 'handles' exceptions from Processes by displaying them.
+        The run_config_wrapped() function puts tracebacks into the
+        exceptions, so that printing them here is actually meaningful.
+        :param exception: The exception thrown by run_config()
+        :return:
+        """
         print(exception)
 
-    def run_experiment(self):
+    def run_experiment_multiprocessing(self, processes=None):
+        """
+        Runs the experiment using the multiprocessing module.
+
+        A process worker pool is created, and tasks are delegated to each
+        worker.  Since there is some process spawning overhead, as well as
+        IPC overhead, this isn't perfect.  Tasks should be slow enough that
+        the speed gains of parallelizing outweigh the overhead of spawning
+        and IPC.
+        :param processes: Number of processes to use in the pool.  Default is
+        None. If None is given, the number from multiprocessing.cpu_count()
+        is used.
+        :return: Blocks until all tasks are complete.  Returns nothing.
+        """
         configs = list(it.product(self.degrees, self.distributions,
                                   self.proportions))
         self.nconfigs = len(configs)
@@ -176,7 +268,7 @@ class DetectionExperiment:
 
         print('Running %d configurations.' % self.nconfigs)
 
-        with mp.Pool() as pool:
+        with mp.Pool(processes=processes) as pool:
             for configuration in configs:
                 resultobjs.append(pool.apply_async(self.run_config_wrapped,
                     (configuration,), callback=self.experiment_callback,
@@ -185,7 +277,16 @@ class DetectionExperiment:
             for result in resultobjs:
                 result.wait()
 
-        self.detection_results.save(os.path.join(self.savedir,
-                                                 'detection_results'))
-        self.mutual_info_results.save(os.path.join(self.savedir,
-                                                   'mutual_info_results'))
+    def save(self, savedir, detection_results_name='detection_results.pickle',
+             mutual_info_results_name='mutual_info_results.pickle'):
+        """
+        Picle the result data frames.
+        :param savedir: Directory to save in.
+        :param detection_results_name: Name for the detection results.
+        :param mutual_info_results_name: Name for the mutual info results.
+        """
+        savedir = os.path.expandvars(os.path.expanduser(savedir))
+        self.detection_results.to_pickle(os.path.join(savedir,
+                                                      detection_results_name))
+        self.mutual_info_results.to_pickle(os.path.join(savedir,
+                                                        mutual_info_results_name))
