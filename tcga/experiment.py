@@ -15,15 +15,14 @@ import multiprocessing as mp
 import random
 import os.path
 import traceback
-import time
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 
 import numpy as np
 from pandas import DataFrame
+import matplotlib.pyplot as plt
 
 from . import compare
-from .util import Progress
 
 
 class Experiment:
@@ -325,7 +324,7 @@ class DetectionExperiment(Experiment):
     def save(self, savedir='.', filenames=None):
         """
         Picle the result data frames.  Stores all files in savedir.  They can be
-        given custom filenames, or saved as 'resultN.pickle'.  
+        given custom filenames, or saved as 'resultN.pickle'.
         :param savedir: Directory to save in.
         :param filenames: File names for each result DataFrame.
         """
@@ -335,3 +334,135 @@ class DetectionExperiment(Experiment):
         savedir = os.path.expandvars(os.path.expanduser(savedir))
         for filename, result in zip(filenames, self.results):
             result.to_pickle(os.path.join(savedir, filename))
+
+
+def _heatmap(dataframe, degree, function_name, x_field, y_field,
+             count_suffix, **kwargs):
+    """
+    Create a heat map.
+    :param dataframe: The data to use.
+    :param degree: The degree of the data that will be plotted.
+    :param function_name: The function that will be plotted.
+    :param x_field: The field that we will plot on the X Axis.
+    :param y_field: The field that we will plot on the Y Axis.
+    :param count_suffix: The filed that will specify the counts.
+    :param kwargs: Keyword args to pass to hist2d().
+    :return: Tuple:
+     [0]: Figure
+     [1]: Subplot/Axes
+     [2]: 2D Histogram object.
+    """
+    subset = dataframe[dataframe['Degree'] == degree]
+    x = []
+    y = []
+    for idx, row in subset.iterrows():
+        count = row[function_name + count_suffix]
+        x += [row[x_field]] * count
+        y += [row[y_field]] * count
+    fig = plt.figure()
+    plot = fig.add_subplot(1, 1, 1)
+    *_, hist = plot.hist2d(x, y, bins=(len(set(x)), len(set(y))), **kwargs)
+    return fig, plot, hist
+
+
+def plot_detection_heat_map(dataframe, degree, function_name):
+    """
+    Creates a heatmap (2D histogram) of reclaimability by distribution.
+    :param dataframe: The data produced by the DetectionExperiment.
+    :param degree: Which degree to plot.
+    :param function_name: The function to plot.
+    :return: A matplotlib Figure.
+    """
+    fig, plot, hist = _heatmap(dataframe, degree, function_name,
+                               'Distribution', 'Proportion', '_ident')
+    plot.set_xlabel('Dataset Distribution')
+    plot.set_ylabel('Implantation Proportion')
+    plot.set_title('Pattern Reclamation for %s, Degree=%d' %
+                   (function_name, degree))
+    fig.colorbar(hist, label='Number of Times Succesfully Reclaimed')
+    return fig
+
+
+def plot_guess_heat_map(dataframe, degree, function_name, match_colors=True):
+    """
+    Creates a heatmap (2D histogram) of reclaimability by distribution.
+    :param dataframe: The data produced by the DetectionExperiment.
+    :param degree: Which degree to plot.
+    :param function_name: The function to plot.
+    :return: A matplotlib Figure.
+    """
+    subset = dataframe[dataframe['Degree'] == degree]
+    max_guess = min_guess = None
+    if match_colors:
+        max_guess = 0
+        min_guess = float('inf')  # infinity
+        for func in compare.COMBINATIONS:
+            max_guess = max(max_guess, max(subset[func.__name__ + '_guess']))
+            min_guess = min(min_guess, min(subset[func.__name__ + '_guess']))
+    fig, plot, hist = _heatmap(dataframe, degree, function_name,
+                               'Distribution', 'Proportion', '_guess',
+                               vmin=min_guess, vmax=max_guess)
+    plot.set_xlabel('Dataset Distribution')
+    plot.set_ylabel('Implantation Proportion')
+    plot.set_title('Pattern Guesses for %s, Degree=%d' %
+                   (function_name, degree))
+    total = len(compare.COMBINATIONS) * dataframe.loc[dataframe.index[0],
+                                                      function_name +
+                                                      '_implant']
+    fig.colorbar(hist, label='Number of Times Guessed (out of %d)' % total)
+    return fig
+
+
+def plot_all_heat_maps(dataframe, dir='.', format='svg',
+                       create_func=plot_detection_heat_map):
+    """
+    Plots the heat maps for every degree and function contained in the
+    dataframe.  Saves them as images in a specified directory.
+    :param dataframe: The data source to plot from.
+    :param dir: The directory to save in.  Accepts environment variables etc.
+    :return: Nothing.
+    """
+    dir = os.path.expandvars(os.path.expanduser(dir))
+    for degree in set(dataframe['Degree']):
+        for function in compare.COMBINATIONS:
+            fig = create_func(dataframe, degree, function.__name__)
+            filename = '%d_%s.%s' % (degree, function.__name__, format)
+            fig.savefig(os.path.join(dir, filename), format=format)
+
+
+def plot_detection_comparison(dataframe, degree, cutoff=0.8):
+    """
+    Plot comparisons between each function with a given degree and cutoff.
+    :param dataframe: Data frame to take the data from.
+    :param degree: Degree to plot.
+    :param cutoff: Ratio of identified/implanted that the lines should trace.
+    :return: The figure produced.
+    """
+    fig = plt.figure()
+    plot = fig.add_subplot(1, 1, 1)
+    subset = dataframe[dataframe['Degree'] == degree]
+    x_axis = sorted(set(dataframe['Distribution']))
+    y_axes = {f: [] for f in compare.COMBINATIONS}
+    for dist in x_axis:
+        dist_subset = subset[subset['Distribution'] == dist]
+        for func in compare.COMBINATIONS:
+            ident = func.__name__ + '_ident'
+            implant = func.__name__ + '_implant'
+            props_over_cutoff = dist_subset[dist_subset[ident] / dist_subset[
+                implant] >= cutoff]
+            if len(props_over_cutoff) == 0:
+                y_axes[func].append(None)
+            else:
+                y_axes[func].append(min(props_over_cutoff['Proportion']))
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    for function, color in zip(y_axes.keys(), colors):
+        plot.plot(x_axis, y_axes[function], color + '-',
+                  label=function.__name__)
+    plot.set_xbound(lower=min(x_axis), upper=max(x_axis))
+    plot.set_ybound(lower=0)
+    plot.set_xlabel('Distribution')
+    plot.set_ylabel('Implantation Proportion')
+    plot.set_title('Comparison of Reclaimability of Functions, Cutoff=%.2f, '
+                   'Degree = %d' % (cutoff, degree))
+    plot.legend()
+    return fig
