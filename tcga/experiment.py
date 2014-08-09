@@ -165,9 +165,9 @@ class DetectionExperiment(Experiment):
     Encapsulates an experiment on how detectable functions are.
 
     In the DetectionExperiment, a configuration is a value for:
-    - Degree (number of items in dataset)
-    - Distribution (P(1) in each dataset)
-    - Proportion (% of phenotype items to overwrite with pattern value)
+    - Sample Size (number of items in dataset)
+    - Sparsity (P(1) in each dataset)
+    - Pattern Density (% of phenotype items to overwrite with pattern value)
     The configuration task attempts to reclaim an imprinted pattern
     self.TRIALS_PER_CONFIG times for each function.  It returns information
     about false positives and negatives, and about the mutual information.
@@ -177,9 +177,9 @@ class DetectionExperiment(Experiment):
         """
         Set up a detection experiment with default values.
         """
-        self.params['Degree'] = [500, 1000, 1500]
-        self.params['Distribution'] = np.arange(0.05, 0.51, 0.05)
-        self.params['Proportions'] = np.arange(0.3, 0.0, -0.01)
+        self.params['Sample Size'] = [500, 1000, 1500]
+        self.params['Sparsity'] = np.arange(0.05, 0.51, 0.05)
+        self.params['Pattern Density'] = np.arange(0.3, 0.0, -0.01)
         self.TRIALS_PER_CONFIG = 50
         self.results = []
 
@@ -226,19 +226,19 @@ class DetectionExperiment(Experiment):
           [2]: The mutual information etween the joint distribution and the
           phenotype.
         """
-        degree, distribution, proportion = configuration
+        sample_size, sparsity, pattern_density = configuration
 
         # Create three random datasets:
-        ds1 = compare.binary_distribution(degree, distribution)
-        ds2 = compare.binary_distribution(degree, distribution)
-        phen = compare.binary_distribution(degree, distribution)
+        ds1 = compare.binary_distribution(sample_size, sparsity)
+        ds2 = compare.binary_distribution(sample_size, sparsity)
+        phen = compare.binary_distribution(sample_size, sparsity)
 
         # Compute f(ds1, ds2) for each function f.
         combinations = {f: f(ds1, ds2) for f in compare.COMBINATIONS}
 
         # Implant the pattern of function in a proportion of the phenotype.
-        amount_to_implant = int(degree * proportion)
-        for i in random.sample(range(degree), amount_to_implant):
+        amount_to_implant = int(sample_size * pattern_density)
+        for i in random.sample(range(sample_size), amount_to_implant):
             phen[i] = combinations[function][i]
 
         # Calculate mutual information between function values
@@ -292,9 +292,9 @@ class DetectionExperiment(Experiment):
             # Generate the mutual information row for this configuration and
             # function.
             mi_row = {
-                'Degree': configuration[0],
-                'Distribution': configuration[1],
-                'Proportion': configuration[2],
+                'Sample Size': configuration[0],
+                'Sparsity': configuration[1],
+                'Pattern Density': configuration[2],
                 'Implanted': func.__name__,
                 'Trials': self.TRIALS_PER_CONFIG,
                 'joint_mean': np.mean(joint_mis),
@@ -309,9 +309,9 @@ class DetectionExperiment(Experiment):
 
         # Generate the detection data row for this configuration.
         detection_row = {
-            'Degree': configuration[0],
-            'Distribution': configuration[1],
-            'Proportion': configuration[2]
+            'Sample Size': configuration[0],
+            'Sparsity': configuration[1],
+            'Pattern Density': configuration[2]
         }
         for func in compare.COMBINATIONS:
             detection_row[func.__name__ + '_implant'] = implant[func]
@@ -363,34 +363,34 @@ def _heatmap(subset, function_name, x_field, y_field,
     return fig, plot, hist
 
 
-def plot_detection_heat_map(dataframe, degree, function_name):
+def plot_detection_heat_map(dataframe, sample_size, function_name):
     """
-    Creates a heatmap (2D histogram) of reclaimability by distribution.
+    Creates a heatmap (2D histogram) of reclaimability by sparsity.
     :param dataframe: The data produced by the DetectionExperiment.
-    :param degree: Which degree to plot.
+    :param sample_size: Which sample_size to plot.
     :param function_name: The function to plot.
     :return: A matplotlib Figure.
     """
-    fig, plot, hist = _heatmap(dataframe[dataframe['Degree'] == degree],
-                               function_name, 'Distribution', 'Proportion',
+    fig, plot, hist = _heatmap(dataframe[dataframe['Sample Size'] == sample_size],
+                               function_name, 'Sparsity', 'Pattern Density',
                                '_ident')
-    plot.set_xlabel('Dataset Distribution')
-    plot.set_ylabel('Implantation Proportion')
-    plot.set_title('Pattern Reclamation for %s, Degree=%d' %
-                   (function_name, degree))
-    fig.colorbar(hist, label='Number of Times Succesfully Reclaimed')
+    plot.set_xlabel('Dataset Sparsity')
+    plot.set_ylabel('Pattern Density')
+    plot.set_title('Pattern Recovery for %s, Sample Size=%d' %
+                   (function_name, sample_size))
+    fig.colorbar(hist, label='Number of Times Succesfully Recovered')
     return fig
 
 
-def plot_guess_heat_map(dataframe, degree, function_name, match_colors=True):
+def plot_guess_heat_map(dataframe, sample_size, function_name, match_colors=True):
     """
-    Creates a heatmap (2D histogram) of reclaimability by distribution.
+    Creates a heatmap (2D histogram) of reclaimability by sparsity.
     :param dataframe: The data produced by the DetectionExperiment.
-    :param degree: Which degree to plot.
+    :param sample_size: Which sample_size to plot.
     :param function_name: The function to plot.
     :return: A matplotlib Figure.
     """
-    subset = dataframe[dataframe['Degree'] == degree]
+    subset = dataframe[dataframe['Sample Size'] == sample_size]
     max_guess = min_guess = None
     if match_colors:
         max_guess = 0
@@ -399,12 +399,12 @@ def plot_guess_heat_map(dataframe, degree, function_name, match_colors=True):
             max_guess = max(max_guess, max(subset[func.__name__ + '_guess']))
             min_guess = min(min_guess, min(subset[func.__name__ + '_guess']))
     fig, plot, hist = _heatmap(subset, function_name,
-                               'Distribution', 'Proportion', '_guess',
+                               'Sparsity', 'Pattern Density', '_guess',
                                vmin=min_guess, vmax=max_guess)
-    plot.set_xlabel('Dataset Distribution')
-    plot.set_ylabel('Implantation Proportion')
-    plot.set_title('Pattern Guesses for %s, Degree=%d' %
-                   (function_name, degree))
+    plot.set_xlabel('Dataset Sparsity')
+    plot.set_ylabel('Pattern Density')
+    plot.set_title('Pattern Guesses for %s, Sample Size=%d' %
+                   (function_name, sample_size))
     total = len(compare.COMBINATIONS) * dataframe.loc[dataframe.index[0],
                                                       function_name +
                                                       '_implant']
@@ -412,16 +412,16 @@ def plot_guess_heat_map(dataframe, degree, function_name, match_colors=True):
     return fig
 
 
-def plot_incorrect_heat_map(dataframe, degree, function_name,
+def plot_incorrect_heat_map(dataframe, sample_size, function_name,
                             match_colors=True):
     """
     Creates a heatmap (2D histogram) of incorrect guesses.
     :param dataframe: The data produced by the DetectionExperiment.
-    :param degree: Which degree to plot.
+    :param sample_size: Which sample_size to plot.
     :param function_name: The function to plot.
     :return: A matplotlib Figure.
     """
-    subset = dataframe[dataframe['Degree'] == degree]
+    subset = dataframe[dataframe['Sample Size'] == sample_size]
     for func in compare.COMBINATIONS:
         name = func.__name__
         subset[name + '_miss'] = subset[name + '_guess'] - subset[name +
@@ -434,13 +434,13 @@ def plot_incorrect_heat_map(dataframe, degree, function_name,
         for func in compare.COMBINATIONS:
             max_guess = max(max_guess, max(subset[func.__name__ + '_miss']))
             min_guess = min(min_guess, min(subset[func.__name__ + '_miss']))
-    fig, plot, hist = _heatmap(subset, function_name, 'Distribution',
-                               'Proportion', '_miss', vmin=min_guess,
+    fig, plot, hist = _heatmap(subset, function_name, 'Sparsity',
+                               'Pattern Density', '_miss', vmin=min_guess,
                                vmax=max_guess)
-    plot.set_xlabel('Dataset Distribution')
-    plot.set_ylabel('Implantation Proportion')
-    plot.set_title('Incorrect Guesses for %s, Degree=%d' %
-                   (function_name, degree))
+    plot.set_xlabel('Dataset Sparsity')
+    plot.set_ylabel('Pattern Density')
+    plot.set_title('Incorrect Guesses for %s, Sample Size=%d' %
+                   (function_name, sample_size))
     fig.colorbar(hist, label='Number of Times Incorrectly Guessed')
     return fig
 
@@ -448,35 +448,35 @@ def plot_incorrect_heat_map(dataframe, degree, function_name,
 def plot_all_heat_maps(dataframe, dir='.', format='svg',
                        create_func=plot_detection_heat_map):
     """
-    Plots the heat maps for every degree and function contained in the
+    Plots the heat maps for every sample_size and function contained in the
     dataframe.  Saves them as images in a specified directory.
     :param dataframe: The data source to plot from.
     :param dir: The directory to save in.  Accepts environment variables etc.
     :return: Nothing.
     """
     dir = os.path.expandvars(os.path.expanduser(dir))
-    for degree in set(dataframe['Degree']):
+    for sample_size in set(dataframe['Sample Size']):
         for function in compare.COMBINATIONS:
-            fig = create_func(dataframe, degree, function.__name__)
-            filename = '%d_%s.%s' % (degree, function.__name__, format)
+            fig = create_func(dataframe, sample_size, function.__name__)
+            filename = '%d_%s.%s' % (sample_size, function.__name__, format)
             fig.savefig(os.path.join(dir, filename), format=format)
 
 
-def plot_detection_comparison(dataframe, degree, cutoff=0.8):
+def plot_detection_comparison(dataframe, sample_size, cutoff=0.8):
     """
-    Plot comparisons between each function with a given degree and cutoff.
+    Plot comparisons between each function with a given sample_size and cutoff.
     :param dataframe: Data frame to take the data from.
-    :param degree: Degree to plot.
+    :param sample_size: Sample Size to plot.
     :param cutoff: Ratio of identified/implanted that the lines should trace.
     :return: The figure produced.
     """
     fig = plt.figure()
     plot = fig.add_subplot(1, 1, 1)
-    subset = dataframe[dataframe['Degree'] == degree]
-    x_axis = sorted(set(dataframe['Distribution']))
+    subset = dataframe[dataframe['Sample Size'] == sample_size]
+    x_axis = sorted(set(dataframe['Sparsity']))
     y_axes = {f: [] for f in compare.COMBINATIONS}
     for dist in x_axis:
-        dist_subset = subset[subset['Distribution'] == dist]
+        dist_subset = subset[subset['Sparsity'] == dist]
         for func in compare.COMBINATIONS:
             ident = func.__name__ + '_ident'
             implant = func.__name__ + '_implant'
@@ -485,16 +485,16 @@ def plot_detection_comparison(dataframe, degree, cutoff=0.8):
             if len(props_over_cutoff) == 0:
                 y_axes[func].append(None)
             else:
-                y_axes[func].append(min(props_over_cutoff['Proportion']))
+                y_axes[func].append(min(props_over_cutoff['Pattern Density']))
     colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
     for function, color in zip(y_axes.keys(), colors):
         plot.plot(x_axis, y_axes[function], color + '-',
                   label=function.__name__)
     plot.set_xbound(lower=min(x_axis), upper=max(x_axis))
     plot.set_ybound(lower=0)
-    plot.set_xlabel('Distribution')
-    plot.set_ylabel('Implantation Proportion')
-    plot.set_title('Comparison of Reclaimability of Functions, Cutoff=%.2f, '
-                   'Degree = %d' % (cutoff, degree))
+    plot.set_xlabel('Sparsity')
+    plot.set_ylabel('Pattern Density')
+    plot.set_title('Comparison of Function Recovery, Cutoff=%.2f, '
+                   'Sample Size = %d' % (cutoff, sample_size))
     plot.legend()
     return fig

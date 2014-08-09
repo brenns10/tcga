@@ -183,38 +183,38 @@ def best_combination(d1, d2, p):
 ################################################################################
 # Benchmarks for pattern detection
 
-def binary_distribution(size, dist):
+def binary_distribution(size, sparsity):
     """
     Generate a boolean dataset of a particular size specified probability.
 
     :param size: The number of items in the dataset.
-    :param dist: The probability of a 1/True.
+    :param sparsity: The probability of a 1/True.
     :return: A Series of bools randomly generated with the given parameters.
     """
     ds = Series(np.random.ranf(size))
-    ds[ds < dist] = 1
+    ds[ds < sparsity] = 1
     ds[ds != 1] = 0
     return ds.astype(bool)
 
 
-def implant_pattern(d1, d2, phenotype, function, proportion):
+def implant_pattern(d1, d2, phenotype, function, pattern_density):
     """
-    Randomly implant a pattern f(d1, d2) into a dataset at a given proportion.
+    Randomly implant a pattern f(d1, d2) into a dataset at a given pattern_density.
     :param d1: First dataset
     :param d2: Second dataset
     :param phenotype: The dataset to implant into
     :param function: The pattern function
-    :param proportion: The proportion to implant at
+    :param pattern_density: The pattern_density to implant at
     :return:
     """
     pattern = function(d1, d2)
     total = len(phenotype)
-    amount = int(proportion * total)
+    amount = int(pattern_density * total)
     for i in random.sample(range(total), amount):
         phenotype[i] = pattern[i]
 
 
-def reclaim_pattern(size, function, proportion, dist=0.5):
+def reclaim_pattern(size, function, pattern_density, dist=0.5):
     """
     Tests the best_combination function.
 
@@ -225,13 +225,13 @@ def reclaim_pattern(size, function, proportion, dist=0.5):
 
     :param size: The size of the distribution to randomly create.
     :param function: The function pattern to implant into the random data.
-    :param proportion: The proportion of the data to implant the pattern into.
+    :param pattern_density: The proportion of the data to implant the pattern into.
     :param dist: The probability of a 1 for the random dataset generation.
     """
     d1 = binary_distribution(size, dist)
     d2 = binary_distribution(size, dist)
     p = binary_distribution(size, dist)
-    implant_pattern(d1, d2, p, function, proportion)
+    implant_pattern(d1, d2, p, function, pattern_density)
     res_func, *etc = best_combination(d1, d2, p)
     return res_func == function
 
@@ -239,20 +239,20 @@ def reclaim_pattern(size, function, proportion, dist=0.5):
 def pattern_detection_rate(size, function, trials, start=0.3, step=0.01,
                            dist=0.5):
     """
-    Finds the lowest proportion at which best_combination works.
+    Finds the lowest pattern_density at which best_combination works.
 
     Uses reclaim_pattern() on the given function and size.  Starts at 30%
     pattern (by default) and moves down by 1% (by default).  Terminates when the
     best combination is not found by every trial (number of trials determined by
-    the variable trials), and returns the failed proportion.
+    the variable trials), and returns the failed pattern_density.
 
     :param size: The size of the dataset to test.
     :param function: The function (from tcga.compare.COMBINATIONS) to test.
     :param trials: The number of trials to perform at each step.
     :param start: The pattern implantation proportion to start at.
-    :param step: The proportion to decrement at each step.
+    :param step: The pattern_density to decrement at each step.
     :param dist: The random distribution.
-    :return: The proportion at which one step failed to identify the pattern.
+    :return: The pattern_density at which one step failed to identify the pattern.
     """
     curr = start
     detected = True
