@@ -498,3 +498,36 @@ def plot_detection_comparison(dataframe, sample_size, cutoff=0.8):
                    'Sample Size = %d' % (cutoff, sample_size))
     plot.legend()
     return fig
+
+
+def plot_mi_comparison(dataframe, func_name, sample_size, sparsity):
+    subset = dataframe[dataframe['Sample Size'] == sample_size]
+    subset = subset[subset['Implanted'] == func_name]
+    subset = subset[subset['Sparsity'] == sparsity]
+    subset = subset.sort('Pattern Density')
+    fig = plt.figure()
+    plot = fig.add_subplot(111)
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
+    for function, color in zip(compare.COMBINATIONS, colors):
+        colname = function.__name__ + '_mean'
+        plot.plot(subset['Pattern Density'], subset[colname], color + '-',
+                  label=function.__name__)
+    plot.plot(subset['Pattern Density'], subset['joint_mean'], 'k-',
+              label='joint_mean')
+    plot.set_xlabel('Pattern Density')
+    plot.set_ylabel('Mean Mutual Information with Phenotype (200 trials)')
+    plot.set_title('Mutual Information by Pattern Density of %s for Various '
+                   'Functions\nSample Size=%d, Sparsity=%.2f' %
+                   (func_name, sample_size, sparsity))
+    plot.legend(loc='upper left')
+    return fig
+
+
+def plot_all_mi_comparisons(dataframe, dir='.', format='svg'):
+    fnames = [f.__name__ for f in compare.COMBINATIONS]
+    ssizes = set(dataframe['Sample Size'])
+    sparsities = set(dataframe['Sparsity'])
+    for fname, ssize, sparsity in it.product(fnames, ssizes, sparsities):
+        fig = plot_mi_comparison(dataframe, fname, ssize, sparsity)
+        filename = '%d_%.2f_%s.%s' % (ssize, sparsity, fname, format)
+        fig.savefig(os.path.join(dir, filename), format=format)
