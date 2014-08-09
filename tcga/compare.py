@@ -72,8 +72,9 @@ def mutual_info(ds1, ds2, ds1domain=2, ds2domain=2):
     :return: The mutual information between the two datasets.
     """
     combined = ds1 + ds2 * ds1domain
-    return entropy(ds1) + entropy(ds2) - entropy(combined, domain=range(
-        ds1domain * ds2domain))
+    return entropy(ds1, domain=range(ds1domain)) + \
+           entropy(ds2, domain=range(ds2domain)) - \
+           entropy(combined, domain=range(ds1domain * ds2domain))
 
 
 def compare_mi_methods(ds1, ds2):
