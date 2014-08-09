@@ -336,12 +336,11 @@ class DetectionExperiment(Experiment):
             result.to_pickle(os.path.join(savedir, filename))
 
 
-def _heatmap(dataframe, degree, function_name, x_field, y_field,
+def _heatmap(subset, function_name, x_field, y_field,
              count_suffix, **kwargs):
     """
     Create a heat map.
     :param dataframe: The data to use.
-    :param degree: The degree of the data that will be plotted.
     :param function_name: The function that will be plotted.
     :param x_field: The field that we will plot on the X Axis.
     :param y_field: The field that we will plot on the Y Axis.
@@ -352,7 +351,6 @@ def _heatmap(dataframe, degree, function_name, x_field, y_field,
      [1]: Subplot/Axes
      [2]: 2D Histogram object.
     """
-    subset = dataframe[dataframe['Degree'] == degree]
     x = []
     y = []
     for idx, row in subset.iterrows():
@@ -373,8 +371,9 @@ def plot_detection_heat_map(dataframe, degree, function_name):
     :param function_name: The function to plot.
     :return: A matplotlib Figure.
     """
-    fig, plot, hist = _heatmap(dataframe, degree, function_name,
-                               'Distribution', 'Proportion', '_ident')
+    fig, plot, hist = _heatmap(dataframe[dataframe['Degree'] == degree],
+                               function_name, 'Distribution', 'Proportion',
+                               '_ident')
     plot.set_xlabel('Dataset Distribution')
     plot.set_ylabel('Implantation Proportion')
     plot.set_title('Pattern Reclamation for %s, Degree=%d' %
@@ -399,7 +398,7 @@ def plot_guess_heat_map(dataframe, degree, function_name, match_colors=True):
         for func in compare.COMBINATIONS:
             max_guess = max(max_guess, max(subset[func.__name__ + '_guess']))
             min_guess = min(min_guess, min(subset[func.__name__ + '_guess']))
-    fig, plot, hist = _heatmap(dataframe, degree, function_name,
+    fig, plot, hist = _heatmap(subset, function_name,
                                'Distribution', 'Proportion', '_guess',
                                vmin=min_guess, vmax=max_guess)
     plot.set_xlabel('Dataset Distribution')
@@ -410,6 +409,39 @@ def plot_guess_heat_map(dataframe, degree, function_name, match_colors=True):
                                                       function_name +
                                                       '_implant']
     fig.colorbar(hist, label='Number of Times Guessed (out of %d)' % total)
+    return fig
+
+
+def plot_incorrect_heat_map(dataframe, degree, function_name,
+                            match_colors=True):
+    """
+    Creates a heatmap (2D histogram) of incorrect guesses.
+    :param dataframe: The data produced by the DetectionExperiment.
+    :param degree: Which degree to plot.
+    :param function_name: The function to plot.
+    :return: A matplotlib Figure.
+    """
+    subset = dataframe[dataframe['Degree'] == degree]
+    for func in compare.COMBINATIONS:
+        name = func.__name__
+        subset[name + '_miss'] = subset[name + '_guess'] - subset[name +
+                                                                    '_ident']
+
+    max_guess = min_guess = None
+    if match_colors:
+        max_guess = 0
+        min_guess = float('inf')  # infinity
+        for func in compare.COMBINATIONS:
+            max_guess = max(max_guess, max(subset[func.__name__ + '_miss']))
+            min_guess = min(min_guess, min(subset[func.__name__ + '_miss']))
+    fig, plot, hist = _heatmap(subset, function_name, 'Distribution',
+                               'Proportion', '_miss', vmin=min_guess,
+                               vmax=max_guess)
+    plot.set_xlabel('Dataset Distribution')
+    plot.set_ylabel('Implantation Proportion')
+    plot.set_title('Incorrect Guesses for %s, Degree=%d' %
+                   (function_name, degree))
+    fig.colorbar(hist, label='Number of Times Incorrectly Guessed')
     return fig
 
 
