@@ -12,6 +12,7 @@
 
 import csv
 from os.path import expanduser, expandvars
+import pickle
 
 import numpy as np
 import pandas as pd
@@ -19,6 +20,7 @@ import pandas as pd
 
 MUTSLOC = '~/data/tcga-brca/mutations.csv'
 PHENLOC = '~/data/tcga-brca/vital-status.csv'
+DAGLOC = '~/data/dag/dag-nx-relabeled.pickle'
 
 
 def _read_csv(filename):
@@ -96,3 +98,9 @@ def sparse_mutations(filename=MUTSLOC, phenotype=None):
         muts = [(gene, patient) for gene, patient in muts if patient in
                 phenotype.index]
     return list(set(muts)) # no duplicates
+
+
+def dag(filename=DAGLOC):
+    filename = expandvars(expanduser(filename))
+    with open(filename, 'rb') as f:
+        return pickle.load(f)

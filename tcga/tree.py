@@ -11,9 +11,11 @@
 #-------------------------------------------------------------------------------
 
 import random
+import collections
 
 import sympy as s
 from pandas import DataFrame
+import networkx as nx
 
 from . import compare, parse, util
 
@@ -40,6 +42,14 @@ def sym_not_and(x, y):
     return ~x & y
 
 
+def sym_x(x, y):
+    return x
+
+
+def sym_y(x, y):
+    return y
+
+
 # This dictionary maps the dataset functions to the symbolic functions, so we
 # can build expressions from the tree we run.
 DS_TO_SYM = {
@@ -48,6 +58,8 @@ DS_TO_SYM = {
     compare.ds_xor: sym_xor,
     compare.ds_and_not: sym_and_not,
     compare.ds_not_and: sym_not_and,
+    compare.ds_x: sym_x,
+    compare.ds_y: sym_y,
 }
 
 
@@ -110,6 +122,135 @@ def random_tree(muts, phen, depth, verbose=True, simplify=False):
     return expr
 
 
+def dag_pattern_recover(muts, phen, dag):
+    leaves = (n for n, d in dag.out_degree_iter() if d == 0)
+    nodes = collections.deque()
+
+    nx.set_node_attributes(dag, 'visited', False)
+    nx.set_node_attributes(dag, 'dataset', None)
+    nx.set_node_attributes(dag, 'function', None)
+    nx.set_node_attributes(dag, 'mutual_info', None)
+
+    print('Examining leaf nodes ...')
+    # Look at all leaf nodes, and make sure that they are contained in the
+    # mutation dataset.
+    for leaf in leaves:
+        # Set up the dataset parameter.
+        params = dag.node[leaf]
+        if leaf not in muts.columns:
+            print('=> No mutation data for leaf node %s, ignoring.' % str(leaf))
+            params['dataset'] = None
+        else:
+            params['dataset'] = leaf
+        params['visited'] = True
+
+        # Add its parent, if all its children are leaves
+        for pred in dag.predecessors(leaf):
+            if all(dag.node[succ]['visited'] for succ in dag.successors(pred)):
+                nodes.appendleft(pred)
+
+    print('Finding best combinations ...')
+    while nodes:
+        # Get the current node and mark it as visited.
+        curr = nodes.pop()
+        params = dag.node[curr]
+        params['visited'] = True
+
+        # Get the best combination of its children.
+        children = dag.successors(curr)
+        if len(children) != 2:
+            raise Exception('Invalid degree of node ' + str(curr))
+        x_key = dag.node[children[0]]['dataset']
+        y_key = dag.node[children[1]]['dataset']
+        if x_key is None:
+            if y_key is None:
+                print('=> No mutation for either child of node %s.' % str(curr))
+                params['dataset'] = None
+            else:
+                params['dataset'] = y_key
+                params['function'] = compare.ds_y
+                params['mutual_info'] = dag.node[children[1]]['mutual_info']
+        else:
+            if y_key is None:
+                params['dataset'] = x_key
+                params['function'] = compare.ds_x
+                params['mutual_info'] = dag.node[children[0]]['mutual_info']
+            else:
+                function, dataset, mi, *etc = compare.best_combination(
+                    muts[x_key], muts[y_key], phen)
+                params['function'] = function
+                params['dataset'] = curr
+                muts[curr] = dataset
+                params['mutual_info'] = mi
+
+        for pred in dag.predecessors(curr):
+            if all(dag.node[succ]['visited'] for succ in dag.successors(pred)):
+                nodes.appendleft(pred)
+
+    print('Done!')
+
+
+def get_roots(dag):
+    return (x for x, d in dag.in_degree_iter() if d == 0)
+
+
+def get_max_root(dag):
+    maxmi = 0
+    maxroot = None
+    for root in get_roots(dag):
+        mi = dag.node[root]['mutual_info']
+        if mi is not None and mi > maxmi:
+            maxmi = mi
+            maxroot = root
+    return maxroot
+
+
+def _get_subtree(dag, node, curr):
+    curr.append(node)
+    func = dag.node[node]
+    successors = dag.successors(node)
+    if successors:
+        if func == compare.ds_x:
+            _get_subtree(dag, successors[0], curr)
+        elif func == compare.ds_y:
+            _get_subtree(dag, successors[1], curr)
+        else:
+            _get_subtree(dag, successors[0], curr)
+            _get_subtree(dag, successors[1], curr)
+
+
+def get_function_subtree(dag, node):
+    nodes = []
+    _get_subtree(dag, node, nodes)
+    return dag.subgraph(nodes)
+
+
+def get_function(dag, node):
+    f = dag.node[node]['function']
+    if f is None:
+        return s.Symbol('[' + str(node) + ']')
+    else:
+        succ = dag.successors(node)
+        return DS_TO_SYM[f](get_function(dag, succ[0]), get_function(dag, succ[1]))
+
+
+def count_disconnected(dag):
+    count = 0
+    nx.set_node_attributes(dag, 'group', None)
+    for node in dag.nodes_iter():
+        if dag.node[node]['group'] is None:
+            count += 1
+            q = collections.deque()
+            q.appendleft(node)
+            while q:
+                curr = q.pop()
+                if dag.node[curr]['group'] is None:
+                    dag.node[curr]['group'] = count
+                    for succ in dag.neighbors(curr):
+                        q.appendleft(succ)
+    return count
+
+
 @util.progress_bar(size_param=(2, 'niters', None))
 def rand_rectangle(mutations, sparse_mutations, niters=None):
     """
@@ -149,8 +290,7 @@ def rand_rectangle(mutations, sparse_mutations, niters=None):
         gene_2, patient_2 = sparse_mutations[idx2]
         if not (mutations[gene_1][patient_2] or mutations[gene_2][
 
-                patient_1]):
-
+            patient_1]):
             yield (idx1, idx2)
             yielded += 1
 
@@ -245,8 +385,8 @@ def greedy_tree(muts, phen, copy=True, out=True):
     if out:
         print(max_mi)
 
-    # Create a new node with the two max-MI nodes.
-    # Remove the two nodes from the data set.
-    # Calculate mutual information between new node and the others, add to set.
+        # Create a new node with the two max-MI nodes.
+        # Remove the two nodes from the data set.
+        # Calculate mutual information between new node and the others, add to set.
 
-    # Finally, output tree.
+        # Finally, output tree.

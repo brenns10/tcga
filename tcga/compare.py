@@ -145,7 +145,15 @@ def ds_not_and(x, y):
     return ds_and(~x, y)
 
 
-COMBINATIONS = [ds_and, ds_or, ds_xor, ds_and_not, ds_not_and]
+def ds_x(x, y):
+    return x
+
+
+def ds_y(x, y):
+    return y
+
+
+COMBINATIONS = [ds_and, ds_or, ds_xor, ds_and_not, ds_not_and, ds_x, ds_y]
 
 
 def best_combination(d1, d2, p):
