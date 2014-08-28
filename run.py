@@ -42,14 +42,6 @@ def run_random_tree():
     tree.random_tree(state['muts'], state['phen'], depth)
 
 
-@main.add_function('Greedy Tree')
-def run_greedy_tree():
-    """Run the greedy tree algorithm."""
-    check_data()
-    print('Beginning \'greedy_tree\' ...')
-    tree.greedy_tree(state['muts'], state['phen'])
-
-
 def check_save(data):
     """Ask if the user would like to save a CSV."""
     response = util.repeat_input('Save? ', str)
