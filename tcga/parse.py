@@ -118,4 +118,4 @@ def sparse_mutations(phenotype=None, filename=MUTSLOC, pickle=True):
 
 
 def dag(filename=DAGLOC):
-    _unpickle(filename)
+    return _unpickle(filename)
