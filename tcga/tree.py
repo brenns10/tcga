@@ -123,6 +123,23 @@ def random_tree(muts, phen, depth, verbose=True, simplify=False):
 
 
 def dag_pattern_recover(muts, phen, dag):
+    """
+    Run the pattern detection algorithm on the given data.
+
+    This function starts at the leaf nodes of the DAG, which are genes.  It
+    moves up through the tree and computes the best binary function to relate
+    the child nodes, using the mutual information between the phenotype and
+    the function value between the children.  It stores the resulting
+    function, dataset, and mutual information as attributes in the nodes.
+
+    Note that not all genes in the DAG have mutation information associated
+    with them.  In this case, the algorithm ignores these children.
+
+    :param muts: The mutation dataset (as pandas DataFrame).
+    :param phen: The phenotype dataset (as pandas DataFrame).
+    :param dag: The DAG (as NetworkX digraph).
+    :return: None
+    """
     leaves = (n for n, d in dag.out_degree_iter() if d == 0)
     nodes = collections.deque()
 
@@ -131,25 +148,24 @@ def dag_pattern_recover(muts, phen, dag):
     nx.set_node_attributes(dag, 'function', None)
     nx.set_node_attributes(dag, 'mutual_info', None)
 
-    print('Examining leaf nodes ...')
-    # Look at all leaf nodes, and make sure that they are contained in the
-    # mutation dataset.
+    # Look at all leaf nodes, and check whether we have mutation data for
+    # them.  If they do, save a reference to that dataset in an attribute.
+    # Else, store None.
     for leaf in leaves:
         # Set up the dataset parameter.
         params = dag.node[leaf]
         if leaf not in muts.columns:
-            print('=> No mutation data for leaf node %s, ignoring.' % str(leaf))
             params['dataset'] = None
         else:
             params['dataset'] = leaf
         params['visited'] = True
 
-        # Add its parent, if all its children are leaves
+        # Add its parent to the iteration queue, if all its children are leaves
         for pred in dag.predecessors(leaf):
             if all(dag.node[succ]['visited'] for succ in dag.successors(pred)):
                 nodes.appendleft(pred)
 
-    print('Finding best combinations ...')
+    # Let the breadth first search begin, but in reverse!
     while nodes:
         # Get the current node and mark it as visited.
         curr = nodes.pop()
@@ -162,20 +178,26 @@ def dag_pattern_recover(muts, phen, dag):
             raise Exception('Invalid degree of node ' + str(curr))
         x_key = dag.node[children[0]]['dataset']
         y_key = dag.node[children[1]]['dataset']
+
+        # The children may not have been included in the mutation datasets.
+        # Check for that here.
         if x_key is None:
             if y_key is None:
-                print('=> No mutation for either child of node %s.' % str(curr))
+                # Neither child has a dataset.
                 params['dataset'] = None
             else:
+                # Y has a dataset, but not X.
                 params['dataset'] = y_key
                 params['function'] = compare.ds_y
                 params['mutual_info'] = dag.node[children[1]]['mutual_info']
         else:
             if y_key is None:
+                # X has a dataset, but not Y.
                 params['dataset'] = x_key
                 params['function'] = compare.ds_x
                 params['mutual_info'] = dag.node[children[0]]['mutual_info']
             else:
+                # Both have datasets.  This is the normal case.
                 function, dataset, mi, *etc = compare.best_combination(
                     muts[x_key], muts[y_key], phen)
                 params['function'] = function
@@ -183,18 +205,29 @@ def dag_pattern_recover(muts, phen, dag):
                 muts[curr] = dataset
                 params['mutual_info'] = mi
 
+        # Add (each) parent if all the parent's children have been visited.
         for pred in dag.predecessors(curr):
             if all(dag.node[succ]['visited'] for succ in dag.successors(pred)):
                 nodes.appendleft(pred)
 
-    print('Done!')
-
 
 def get_roots(dag):
+    """
+    Returns the roots of a forest of DAGs.
+    :param dag: A NetworkX directed graph.
+    :return: A generator that yields each root node in the DAG.
+    """
     return (x for x, d in dag.in_degree_iter() if d == 0)
 
 
 def get_max_root(dag):
+    """
+    Return the DAG root that has the highest mutual information associated
+    with it (after calling dag_pattern_reover() on the DAG).
+    :param dag: The NetworkX DAG, which has already had dag_pattern_recover()
+    called on it.
+    :return: The root with the highest mutual information.
+    """
     maxmi = 0
     maxroot = None
     for root in get_roots(dag):
@@ -205,27 +238,49 @@ def get_max_root(dag):
     return maxroot
 
 
-def _get_subtree(dag, node, curr):
-    curr.append(node)
+def _get_subtree(dag, node, subtree):
+    """
+    Recursive helper function to get_function_subtree().  Adds the current
+    node to the subtree list.  Calls the function on each child if it is part of
+    the function.
+    :param dag: The DAG we are finding the subtree of.
+    :param node: The current node we are recursively operating on.
+    :param subtree: The list of nodes in this subtree.
+    :return: None
+    """
+    subtree.append(node)
     func = dag.node[node]
     successors = dag.successors(node)
     if successors:
         if func == compare.ds_x:
-            _get_subtree(dag, successors[0], curr)
+            _get_subtree(dag, successors[0], subtree)
         elif func == compare.ds_y:
-            _get_subtree(dag, successors[1], curr)
+            _get_subtree(dag, successors[1], subtree)
         else:
-            _get_subtree(dag, successors[0], curr)
-            _get_subtree(dag, successors[1], curr)
+            _get_subtree(dag, successors[0], subtree)
+            _get_subtree(dag, successors[1], subtree)
 
 
 def get_function_subtree(dag, node):
+    """
+    Returns the subtree of the total DAG that contains only the function
+    rooted at the given node.
+    :param dag: The DAG which has had dag_pattern_recover() run on it.
+    :param node: The node to find the function subtree of.
+    :return: A NetworkX subgraph of the given DAG.
+    """
     nodes = []
     _get_subtree(dag, node, nodes)
     return dag.subgraph(nodes)
 
 
 def get_function(dag, node):
+    """
+    Return a SymPy representation of the function rooted at the given node.
+    :param dag: DAG which has had dag_pattern_recover() run on it.
+    :param node: The node to return the function of.
+    :return: A SymPy expression of the binary function.
+    """
     f = dag.node[node]['function']
     if f is None:
         return s.Symbol('[' + str(node) + ']')
@@ -235,6 +290,11 @@ def get_function(dag, node):
 
 
 def count_disconnected(dag):
+    """
+    Count the number of disconnected trees in a NetworkX DAG.
+    :param dag: The DAG to count disconnected trees of.
+    :return: The number of disconnected trees.
+    """
     count = 0
     nx.set_node_attributes(dag, 'group', None)
     for node in dag.nodes_iter():
@@ -251,7 +311,6 @@ def count_disconnected(dag):
     return count
 
 
-@util.progress_bar(size_param=(2, 'niters', None))
 def rand_rectangle(mutations, sparse_mutations, niters=None):
     """
     An iterator that yields swappable rectangles from the mutations matrix.
@@ -288,9 +347,7 @@ def rand_rectangle(mutations, sparse_mutations, niters=None):
         idx2 = random.randrange(len(sparse_mutations))
         gene_1, patient_1 = sparse_mutations[idx1]
         gene_2, patient_2 = sparse_mutations[idx2]
-        if not (mutations[gene_1][patient_2] or mutations[gene_2][
-
-            patient_1]):
+        if not (mutations[gene_1][patient_2] or mutations[gene_2][patient_1]):
             yield (idx1, idx2)
             yielded += 1
 
