@@ -361,7 +361,7 @@ def randomize_mutations(mutations, sparse_mutations, num_iterations=None):
         mutations[gene1][patient1] = False
         mutations[gene2][patient2] = False
 
-        # Performe the swap in the sparse data structure.
+        # Perform the swap in the sparse data structure.
         del sparse[max(idx1, idx2)]
         del sparse[min(idx1, idx2)]
         sparse.append((gene1, patient2))
