@@ -19,8 +19,20 @@ import pandas as pd
 
 
 MUTSLOC = '~/data/tcga-brca/mutations.csv'
+MUTSPIC = '~/data/tcga-brca/mutations.pickle'
+
+SPARSEMUTSLOC = '~/data/tcga-brca/sparse-mutations.pickle'
+
 PHENLOC = '~/data/tcga-brca/vital-status.csv'
+PHENPIC = '~/data/tcga-brca/vital-status.pickle'
+
 DAGLOC = '~/data/dag/dag-nx-relabeled.pickle'
+
+
+def _unpickle(filename):
+    filename = expandvars(expanduser(filename))
+    with open(filename, 'rb') as f:
+        return pickle.load(f)
 
 
 def _read_csv(filename):
@@ -76,14 +88,18 @@ def add_empties(muts, phen):
     return muts, phen
 
 
-def data(mutationsloc=MUTSLOC, phenotypesloc=PHENLOC, phenotypesdtype=bool):
+def data(mutationsloc=MUTSLOC, phenotypesloc=PHENLOC, phenotypesdtype=bool,
+         pickle=True):
     """Read both data files and restrict patients to those contained in both."""
-    muts = mutations(mutationsloc)
-    phen = phenotypes(phenotypesloc, phenotypesdtype)
-    return add_empties(muts, phen)
+    if pickle:
+        return _unpickle(MUTSPIC), _unpickle(PHENPIC)
+    else:
+        muts = mutations(mutationsloc)
+        phen = phenotypes(phenotypesloc, phenotypesdtype)
+        return add_empties(muts, phen)
 
 
-def sparse_mutations(filename=MUTSLOC, phenotype=None):
+def sparse_mutations(phenotype=None, filename=MUTSLOC, pickle=True):
     """
     Reads the sparse mutations, and returns a list of (gene, patient) tuples.
     Restricts to only the patients included in the phenotype index,
@@ -92,15 +108,14 @@ def sparse_mutations(filename=MUTSLOC, phenotype=None):
     :param phenotype: The phenotype Series.
     :return: A Python list of (gene, patient) tuples.
     """
+    if pickle:
+        return _unpickle(SPARSEMUTSLOC)
     filename = expanduser(expandvars(filename))
     muts = list(_read_csv(filename))
-    if phenotype is not None:
-        muts = [(gene, patient) for gene, patient in muts if patient in
-                phenotype.index]
+    muts = [(gene, patient) for gene, patient in muts if patient in
+            phenotype.index]
     return list(set(muts)) # no duplicates
 
 
 def dag(filename=DAGLOC):
-    filename = expandvars(expanduser(filename))
-    with open(filename, 'rb') as f:
-        return pickle.load(f)
+    _unpickle(filename)

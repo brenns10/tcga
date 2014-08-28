@@ -14,10 +14,9 @@ import random
 import collections
 
 import sympy as s
-from pandas import DataFrame
 import networkx as nx
 
-from . import compare, parse, util
+from . import compare
 
 
 # These are functions that take expressions and combine them using whatever
@@ -311,74 +310,64 @@ def count_disconnected(dag):
     return count
 
 
-def rand_rectangle(mutations, sparse_mutations, niters=None):
-    """
-    An iterator that yields swappable rectangles from the mutations matrix.
-
-    In order to create a randomized matrix that retains the properties of the
-    original, we take the original matrix, and randomly choose two points
-    such that both are True, and the opposite corners of the rectangle they
-    form are False.  Graphically:
-
-    [ 1 .... 0 ]
-    [ .      . ]
-    [ .      . ]
-    [ 0 .... 1 ]
-
-    This function is an iterator that yields a certain number of these
-    rectangles, randomly selected.  Note that the parameters mutations and
-    sparse_mutations should be updated on every swap.  Thus, it isn't
-    advisable to do list(rand_rectangle(...)), as some of the later
-    rectangles might be affected by previous swaps.
-
-    :param mutations: The mutations DataFrame that we are randomizing.
-    :param sparse_mutations: A sparse representation of the mutations we are
-    randomizing, so we can quickly choose values which are True.
-    :param niters: The number of rectangles to yield.
-    :return: Tuple: (gene_1, patient_1, gene_2, patient_2).
-    """
-    import random
-
-    if niters is None:
-        niters = 4 * len(sparse_mutations)
-    yielded = 0
-    while yielded < niters:
-        idx1 = random.randrange(len(sparse_mutations))
-        idx2 = random.randrange(len(sparse_mutations))
-        gene_1, patient_1 = sparse_mutations[idx1]
-        gene_2, patient_2 = sparse_mutations[idx2]
-        if not (mutations[gene_1][patient_2] or mutations[gene_2][patient_1]):
-            yield (idx1, idx2)
-            yielded += 1
-
-
-def randomize_mutations(mutations, mutationsloc=parse.MUTSLOC,
-                        num_iterations=None, phenotype=None):
+def randomize_mutations(mutations, sparse_mutations, num_iterations=None):
     """
     Perform random swaps on mutation data until it is randomized.
 
-    :param mutations: Mutations dataset.
-    :param mutationsloc: location of the mutations CSV
-    :param num_iterations: Number of swaps to make.
-    :param phenotype: Phenotype dataset.
-    :return: Randomized dataset.
-    """
-    new_mutations = mutations.copy()
-    sparse_mutations = parse.sparse_mutations(filename=mutationsloc,
-                                              phenotype=phenotype)
-    if num_iterations is None:
-        num_iterations = 4 * len(sparse_mutations)
+    In order to randomize the mutation data while maintaining the
+    characteristics of the dataset (i.e. row & column counts), we randomly
+    choose two locations where the data is True, and if the opposite corners
+    of the rectangle formed by them are both False, we flip all the corners.
+    Graphically:
 
-    for idx1, idx2 in rand_rectangle(new_mutations, sparse_mutations,
-                                     num_iterations):
-        gene_1, patient_1 = sparse_mutations[idx1]
-        gene_2, patient_2 = sparse_mutations[idx2]
-        new_mutations[gene_1][patient_2] = True
-        new_mutations[gene_2][patient_1] = True
-        new_mutations[gene_1][patient_1] = False
-        new_mutations[gene_2][patient_2] = False
-        del sparse_mutations[idx1]
-        del sparse_mutations[idx2 - 1]
-        sparse_mutations.append((gene_1, patient_2))
-        sparse_mutations.append((gene_2, patient_1))
-    return new_mutations
+    [ 1 .... 0 ]         [ 0 .... 1 ]
+    [ .      . ] becomes [ .      . ]
+    [ .      . ]         [ .      . ]
+    [ 0 .... 1 ]         [ 1 .... 0 ]
+
+    This process is repeated many times (by default, 4x the number of True
+    values in the matrix, to allow each True value to have the chance to have
+    flipped to False and back).
+
+    :param mutations: Mutations dataset.  This dataset is NOT modified.
+    :param sparse_mutations: Sparse mutations list.  Also NOT modified.
+    :param num_iterations: Number of swaps to make.  By default,
+    4*len(sparse_mutations).
+    :return: A new, randomized dataset.
+    """
+    mutations = mutations.copy()
+    sparse = sparse_mutations.copy()
+    if num_iterations is None:
+        num_iterations = 4 * len(sparse)
+
+    while num_iterations:
+        # Randomly select two mutations.
+        idx1 = random.randrange(len(sparse))
+        idx2 = random.randrange(len(sparse))
+        gene1, patient1 = sparse[idx1]
+        gene2, patient2 = sparse[idx2]
+
+        # Make sure we don't swap the same gene/patient and count it
+        if gene1 == gene2 and patient1 == patient2:
+            continue
+
+        # Make sure that the corners are both False
+        if mutations[gene1][patient2] or mutations[gene2][patient1]:
+            continue
+
+        # Perform the swap in the full data structure.
+        mutations[gene1][patient2] = True
+        mutations[gene2][patient1] = True
+        mutations[gene1][patient1] = False
+        mutations[gene2][patient2] = False
+
+        # Performe the swap in the sparse data structure.
+        del sparse[max(idx1, idx2)]
+        del sparse[min(idx1, idx2)]
+        sparse.append((gene1, patient2))
+        sparse.append((gene2, patient1))
+
+        # Loop down to zero.
+        num_iterations -= 1
+
+    return sparse
