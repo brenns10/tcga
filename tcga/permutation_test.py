@@ -98,6 +98,8 @@ class PermutationTest(Experiment):
         self.dag = parse.dag()
         self.sparse = parse.sparse_mutations()
         self.results = []
+        self.min_k = {}
+        self.max_k = {}
         self.params['Trial'] = range(trials)
         self.trials = trials
 
@@ -105,10 +107,21 @@ class PermutationTest(Experiment):
         taskid = config[0]
         rand_muts = randomize_mutations(self.muts, self.sparse)
         dag_copy = self.dag.copy()
-        dag_pattern_recover(rand_muts, self.phen, dag_copy)
+        min_k = {}
+        max_k = {}
+        dag_pattern_recover(rand_muts, self.phen, dag_copy, min_k=min_k,
+                            max_k=max_k)
         maxroot = get_max_root(dag_copy)
-        return dag_copy.node[maxroot]['mutual_info']
+        return dag_copy.node[maxroot]['mutual_info'], min_k, max_k
 
     def task_callback(self, retval):
-        self.results.append(retval)
-        print('Completed %d of %d trials.' % (self.completed, self.trials))
+        mi, min_k, max_k = retval
+        self.results.append(mi)
+        for k, v in min_k.items():
+            l = self.min_k.get(k, [])
+            l.append(v)
+            self.min_k[k] = l
+        for k, v in max_k.items():
+            l = self.max_k.get(k, [])
+            l.append(v)
+            self.max_k[k] = l

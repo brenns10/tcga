@@ -121,7 +121,7 @@ def random_tree(muts, phen, depth, verbose=True, simplify=False):
     return expr
 
 
-def dag_pattern_recover(muts, phen, dag):
+def dag_pattern_recover(muts, phen, dag, min_k={}, max_k={}):
     """
     Run the pattern detection algorithm on the given data.
 
@@ -157,7 +157,17 @@ def dag_pattern_recover(muts, phen, dag):
             params['dataset'] = None
         else:
             params['dataset'] = leaf
+            params['mutual_info'] = compare.mutual_info(muts[leaf], phen)
         params['visited'] = True
+
+        # K = distance from leaves. Record best mutual info as a function of
+        # distance from leaves. (calculated as min, and max)
+        params['min-k'] = 0
+        params['max-k'] = 0
+        mi = params['mutual_info']
+        if mi is not None:
+            min_k[0] = max(mi, min_k.get(0, 0))
+            max_k[0] = max(mi, max_k.get(0, 0))
 
         # Add its parent to the iteration queue, if all its children are leaves
         for pred in dag.predecessors(leaf):
@@ -177,6 +187,12 @@ def dag_pattern_recover(muts, phen, dag):
             raise Exception('Invalid degree of node ' + str(curr))
         x_key = dag.node[children[0]]['dataset']
         y_key = dag.node[children[1]]['dataset']
+
+        # Set k values by children's k values.
+        params['min-k'] = 1 + min(dag.node[children[0]]['min-k'],
+                                  dag.node[children[1]]['min-k'])
+        params['max-k'] = 1 + max(dag.node[children[0]]['max-k'],
+                                  dag.node[children[1]]['max-k'])
 
         # The children may not have been included in the mutation datasets.
         # Check for that here.
@@ -203,6 +219,11 @@ def dag_pattern_recover(muts, phen, dag):
                 params['dataset'] = curr
                 muts[curr] = dataset
                 params['mutual_info'] = mi
+
+        mi = params['mutual_info']
+        if mi is not None:
+            min_k[params['min-k']] = max(mi, min_k.get(params['min-k'], 0))
+            max_k[params['max-k']] = max(mi, max_k.get(params['max-k'], 0))
 
         # Add (each) parent if all the parent's children have been visited.
         for pred in dag.predecessors(curr):
