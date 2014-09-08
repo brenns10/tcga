@@ -121,7 +121,7 @@ def random_tree(muts, phen, depth, verbose=True, simplify=False):
     return expr
 
 
-def dag_pattern_recover(muts, phen, dag, min_k={}, max_k={}):
+def dag_pattern_recover(muts, phen, dag, by_gene={}):
     """
     Run the pattern detection algorithm on the given data.
 
@@ -160,14 +160,13 @@ def dag_pattern_recover(muts, phen, dag, min_k={}, max_k={}):
             params['mutual_info'] = compare.mutual_info(muts[leaf], phen)
         params['visited'] = True
 
-        # K = distance from leaves. Record best mutual info as a function of
-        # distance from leaves. (calculated as min, and max)
-        params['min-k'] = 0
-        params['max-k'] = 0
+        # Set the number of genes in the subtree.
+        params['genes'] = 1
+
+        # Record the maximum mutual information for a subtree of size 1.
         mi = params['mutual_info']
         if mi is not None:
-            min_k[0] = max(mi, min_k.get(0, 0))
-            max_k[0] = max(mi, max_k.get(0, 0))
+            by_gene[1] = max(mi, by_gene.get(1, 0))
 
         # Add its parent to the iteration queue, if all its children are leaves
         for pred in dag.predecessors(leaf):
@@ -185,14 +184,13 @@ def dag_pattern_recover(muts, phen, dag, min_k={}, max_k={}):
         children = dag.successors(curr)
         if len(children) != 2:
             raise Exception('Invalid degree of node ' + str(curr))
-        x_key = dag.node[children[0]]['dataset']
-        y_key = dag.node[children[1]]['dataset']
+        x_params = dag.node[children[0]]
+        y_params = dag.node[children[1]]
+        x_key = x_params['dataset']
+        y_key = y_params['dataset']
 
-        # Set k values by children's k values.
-        params['min-k'] = 1 + min(dag.node[children[0]]['min-k'],
-                                  dag.node[children[1]]['min-k'])
-        params['max-k'] = 1 + max(dag.node[children[0]]['max-k'],
-                                  dag.node[children[1]]['max-k'])
+        # Set the number of genes in this subtree by the children.
+        params['genes'] = x_params['genes'] + y_params['genes'])
 
         # The children may not have been included in the mutation datasets.
         # Check for that here.
@@ -204,13 +202,13 @@ def dag_pattern_recover(muts, phen, dag, min_k={}, max_k={}):
                 # Y has a dataset, but not X.
                 params['dataset'] = y_key
                 params['function'] = compare.ds_y
-                params['mutual_info'] = dag.node[children[1]]['mutual_info']
+                params['mutual_info'] = y_params['mutual_info']
         else:
             if y_key is None:
                 # X has a dataset, but not Y.
                 params['dataset'] = x_key
                 params['function'] = compare.ds_x
-                params['mutual_info'] = dag.node[children[0]]['mutual_info']
+                params['mutual_info'] = x_params['mutual_info']
             else:
                 # Both have datasets.  This is the normal case.
                 function, dataset, mi, *etc = compare.best_combination(
@@ -222,8 +220,7 @@ def dag_pattern_recover(muts, phen, dag, min_k={}, max_k={}):
 
         mi = params['mutual_info']
         if mi is not None:
-            min_k[params['min-k']] = max(mi, min_k.get(params['min-k'], 0))
-            max_k[params['max-k']] = max(mi, max_k.get(params['max-k'], 0))
+            by_gene[params['genes']] = max(mi, by_gene.get(params['genes'], 0))
 
         # Add (each) parent if all the parent's children have been visited.
         for pred in dag.predecessors(curr):
