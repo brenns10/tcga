@@ -190,7 +190,7 @@ def dag_pattern_recover(muts, phen, dag, by_gene={}):
         y_key = y_params['dataset']
 
         # Set the number of genes in this subtree by the children.
-        params['genes'] = x_params['genes'] + y_params['genes'])
+        params['genes'] = x_params['genes'] + y_params['genes']
 
         # The children may not have been included in the mutation datasets.
         # Check for that here.
