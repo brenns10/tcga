@@ -8,6 +8,13 @@
 #
 # Description:  Contains PermutationTest class and assorted functions.
 #
+# The PermutationTest is a subclass of Experiment, which means it can be
+# multiprocessed very well.  The PermutationTest randomizes the mutation
+# dataset, and then records the results of dag_pattern_recover() using this
+# mutation dataset.  Its purpose is to establish whether the result of
+# running dag_pattern_recover() on the real mutation dataset is significant
+# or not.
+#
 #-------------------------------------------------------------------------------
 
 import random
@@ -93,16 +100,41 @@ class PermutationTest(Experiment):
     real pattern has been detected.
     """
 
-    def __init__(self, trials=1000):
-        self.muts, self.phen = parse.data()
-        self.dag = parse.dag()
+    def __init__(self, phenotype='vital-status', trials=1000):
+        """
+        Create an instance of PermutationTest.
+        :param trials: Number of times to run the permutation test.
+        :return: New instance of PermutationTest.
+        """
+        # Load necessary data:
+        self.muts, self.phen = parse.data(phenotype_title=phenotype)
         self.sparse = parse.sparse_mutations()
+        self.sparse = parse.restrict_sparse_mutations(self.sparse, self.phen)
+        self.dag = parse.dag()
+
+        # Result list for each mutual information.
         self.results = []
+        # Dictionary of gene count -> list of mutual info's.
         self.by_gene = {}
+
+        # This experiment is simply repeated for many trials.  No parameters
+        # are varying.
         self.params['Trial'] = range(trials)
         self.trials = trials
 
     def run_task(self, config):
+        """
+        Task that is repeated for each trial.
+
+        Generate a random mutation dataset.  Run the dag_pattern_recover()
+        function using the random dataset, along with the original phenotype
+        and DAG.
+        :param config: Variable containing the parameters (in this case,
+        just the trial number).
+        :return: A 2-tuple:
+        [0] Mutual information of the best root.
+        [1] Dictionary of best mutual info by number of genes in subtree.
+        """
         taskid = config[0]
         rand_muts = randomize_mutations(self.muts, self.sparse)
         dag_copy = self.dag.copy()
@@ -112,8 +144,16 @@ class PermutationTest(Experiment):
         return dag_copy.node[maxroot]['mutual_info'], by_gene
 
     def task_callback(self, retval):
+        """
+        Store the data from the task.  Executed on main process.
+        :param retval: Return value from run_task().
+        :return: None
+        """
         mi, by_gene = retval
+        # Just add the best MI to the list.
         self.results.append(mi)
+        # Append each element of the dictionary to the overall dictionary's
+        # lists.
         for k, v in by_gene.items():
             l = self.by_gene.get(k, [])
             l.append(v)
