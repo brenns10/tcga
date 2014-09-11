@@ -1,6 +1,6 @@
 #-------------------------------------------------------------------------------
 #
-# File:         experiment.py
+# File:         permutation_test.py
 #
 # Author:       Stephen Brennan
 #
