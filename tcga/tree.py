@@ -121,31 +121,68 @@ def random_tree(muts, phen, depth, verbose=True, simplify=False):
     return expr
 
 
-def dag_pattern_recover(muts, phen, dag, by_gene={}):
+def _initialize_node_attributes(dag):
     """
-    Run the pattern detection algorithm on the given data.
-
-    This function starts at the leaf nodes of the DAG, which are genes.  It
-    moves up through the tree and computes the best binary function to relate
-    the child nodes, using the mutual information between the phenotype and
-    the function value between the children.  It stores the resulting
-    function, dataset, and mutual information as attributes in the nodes.
-
-    Note that not all genes in the DAG have mutation information associated
-    with them.  In this case, the algorithm ignores these children.
-
-    :param muts: The mutation dataset (as pandas DataFrame).
-    :param phen: The phenotype dataset (as pandas DataFrame).
-    :param dag: The DAG (as NetworkX digraph).
+    Set the node attributes used by dag_pattern_recover to default values.
+    :param dag: The DAG to set attributes of.
     :return: None
     """
-    leaves = (n for n, d in dag.out_degree_iter() if d == 0)
-    nodes = collections.deque()
-
+    # Whether each node has been visited by the search yet.
     nx.set_node_attributes(dag, 'visited', False)
+    # The title of the row in the mutations dataset corresponding to this node.
     nx.set_node_attributes(dag, 'dataset', None)
+    # The function chosen at this (internal) node.
     nx.set_node_attributes(dag, 'function', None)
+    # The mutual information of this node's dataset with the phenotype.
     nx.set_node_attributes(dag, 'mutual_info', None)
+    # The number of genes in the subtree rooted at this node.
+    nx.set_node_attributes(dag, 'genes', None)
+
+
+def _update_max_mutual_info(k, mi, by_gene):
+    """
+    Update the max mutual info accounting in by_gene.
+    :param k: The k value for the node.
+    :param mi: The mutual info of the node.
+    :param by_gene: The dictionary the data is stored at.
+    :return: None.
+    """
+    # Update the max mutual info.
+    if mi is not None:
+        by_gene[k] = max(by_gene.get(k, 0), mi)
+
+
+def _add_parent_nodes(node, dag, node_queue):
+    """
+    Add a node's parents to the queue.  Only does so if the parent has all
+    its successors visited.
+    :param node: Node whose parents to add to queue.
+    :param dag: DAG the node is from.
+    :param node_queue: Queue to add parents to.
+    :return: None
+    """
+    for pred in dag.predecessors(node):  # could have multiple parents
+        if all(dag.node[succ]['visited'] for succ in dag.successors(pred)):
+            node_queue.appendleft(pred)
+
+
+def _initialize_leaves(muts, phen, dag, by_gene):
+    """
+    Create a queue initialized with the leaves of the DAG.
+
+    This function is a subroutine of dag_pattern_recover.  It initializes the
+    leaf nodes with the correct dataset, mutual_info attributes.  Also,
+    it creates a queue containing each leaf of the DAG, so that a reverse
+    breadth first search can be done.
+    :param muts: Mutation dataset (needed for dataset attribute).
+    :param phen: Phenotype dataset (needed for mutual_info attribute).
+    :param dag: DAG (needed in order to set attributes).
+    :param by_gene: Dictionary that keeps track of the best mutual info by
+    gene count.
+    :return: A queue containing the leaves of the DAG.
+    """
+    nodes = collections.deque()
+    leaves = (n for n, d in dag.out_degree_iter() if d == 0)
 
     # Look at all leaf nodes, and check whether we have mutation data for
     # them.  If they do, save a reference to that dataset in an attribute.
@@ -164,68 +201,108 @@ def dag_pattern_recover(muts, phen, dag, by_gene={}):
         params['genes'] = 1
 
         # Record the maximum mutual information for a subtree of size 1.
-        mi = params['mutual_info']
-        if mi is not None:
-            by_gene[1] = max(mi, by_gene.get(1, 0))
+        _update_max_mutual_info(1, params['mutual_info'], by_gene)
 
-        # Add its parent to the iteration queue, if all its children are leaves
-        for pred in dag.predecessors(leaf):
-            if all(dag.node[succ]['visited'] for succ in dag.successors(pred)):
-                nodes.appendleft(pred)
+        _add_parent_nodes(leaf, dag, nodes)
 
-    # Let the breadth first search begin, but in reverse!
+    return nodes
+
+
+def _compare_and_set_attributes(curr, dag, muts, phen):
+    """
+    Compare the datasets X and Y, and set the attributes of their parent.
+
+    This function is basically the body of the loop of dag_pattern_recover.
+    It gets the datasets for X and Y.  If both exist, it compares them,
+    and selects their best combination.  If only one exists, then it selects
+    that one.  If none exist, it does nothing.
+    :param curr: The current node.
+    :param dag: The DAG the node is in.
+    :param muts: The mutations dataset.
+    :param phen: The phenotype dataset.
+    :return: The mutual information of the chosen function.
+    """
+    params = dag.node[curr]
+
+    # Get the children of this node
+    children = dag.successors(curr)
+    if len(children) != 2:
+        raise Exception('Invalid degree of node ' + str(curr))
+
+    x_params = dag.node[children[0]]
+    y_params = dag.node[children[1]]
+    x_key = x_params['dataset']
+    y_key = y_params['dataset']
+    value = None
+
+    if x_key is None:
+        if y_key is None:
+            # Neither child has a dataset.
+            params['dataset'] = None
+        else:
+            # Y has a dataset, but not X.
+            params['genes'] = y_params['genes']
+            params['dataset'] = y_key
+            params['function'] = compare.ds_y
+            params['mutual_info'] = y_params['mutual_info']
+    else:
+        if y_key is None:
+            # X has a dataset, but not Y.
+            params['genes'] = x_params['genes']
+            params['dataset'] = x_key
+            params['function'] = compare.ds_x
+            params['mutual_info'] = x_params['mutual_info']
+        else:
+            # Both have datasets.  This is the normal case.
+            params['genes'] = x_params['genes'] + y_params['genes']
+            function, dataset, value, *etc = compare.best_combination(
+                muts[x_key], muts[y_key], phen)
+            params['function'] = function
+            params['dataset'] = curr
+            muts[curr] = dataset
+            params['mutual_info'] = value
+    return value
+
+
+def dag_pattern_recover(muts, phen, dag):
+    """
+    Run the pattern detection algorithm on the given data.
+
+    This function starts at the leaf nodes of the DAG, which are genes.  It
+    moves up through the tree and computes the best binary function to relate
+    the child nodes, using the mutual information between the phenotype and
+    the function value between the children.  It stores the resulting
+    function, dataset, and mutual information as attributes in the nodes.
+
+    Note that not all genes in the DAG have mutation information associated
+    with them.  In this case, the algorithm ignores these children.
+
+    :param muts: The mutation dataset (as pandas DataFrame).
+    :param phen: The phenotype dataset (as pandas DataFrame).
+    :param dag: The DAG (as NetworkX digraph).
+    :return: A dictionary containing the best mutual information for every
+    value of k (k=#of genes in the node's function).
+    """
+    by_gene = {}
+    # Set the node attributes used by this function to default values.
+    _initialize_node_attributes(dag)
+    # Initialize the leaves and add them to a queue.
+    nodes = _initialize_leaves(muts, phen, dag, by_gene)
+
+    # Do a reverse breadth-first-search, starting at the leaves and working up.
     while nodes:
         # Get the current node and mark it as visited.
         curr = nodes.pop()
         params = dag.node[curr]
         params['visited'] = True
 
-        # Get the best combination of its children.
-        children = dag.successors(curr)
-        if len(children) != 2:
-            raise Exception('Invalid degree of node ' + str(curr))
-        x_params = dag.node[children[0]]
-        y_params = dag.node[children[1]]
-        x_key = x_params['dataset']
-        y_key = y_params['dataset']
-
-        # Set the number of genes in this subtree by the children.
-        params['genes'] = x_params['genes'] + y_params['genes']
-
-        # The children may not have been included in the mutation datasets.
-        # Check for that here.
-        if x_key is None:
-            if y_key is None:
-                # Neither child has a dataset.
-                params['dataset'] = None
-            else:
-                # Y has a dataset, but not X.
-                params['dataset'] = y_key
-                params['function'] = compare.ds_y
-                params['mutual_info'] = y_params['mutual_info']
-        else:
-            if y_key is None:
-                # X has a dataset, but not Y.
-                params['dataset'] = x_key
-                params['function'] = compare.ds_x
-                params['mutual_info'] = x_params['mutual_info']
-            else:
-                # Both have datasets.  This is the normal case.
-                function, dataset, mi, *etc = compare.best_combination(
-                    muts[x_key], muts[y_key], phen)
-                params['function'] = function
-                params['dataset'] = curr
-                muts[curr] = dataset
-                params['mutual_info'] = mi
-
-        mi = params['mutual_info']
-        if mi is not None:
-            by_gene[params['genes']] = max(mi, by_gene.get(params['genes'], 0))
-
-        # Add (each) parent if all the parent's children have been visited.
-        for pred in dag.predecessors(curr):
-            if all(dag.node[succ]['visited'] for succ in dag.successors(pred)):
-                nodes.appendleft(pred)
+        # Perform the comparison (returns mutual information).
+        value = _compare_and_set_attributes(curr, dag, muts, phen)
+        # Update the accounting of the best mutual_info.
+        _update_max_mutual_info(params['genes'], value, by_gene)
+        # Add parents to the queue if they're ready.
+        _add_parent_nodes(curr, dag, nodes)
+    return by_gene
 
 
 def get_roots(dag):
