@@ -100,16 +100,19 @@ class PermutationTest(Experiment):
     real pattern has been detected.
     """
 
-    def __init__(self, phenotype='vital-status', trials=1000):
+    def __init__(self, phenotype='vital-status', mutations='mutations',
+                 trials=1000):
         """
         Create an instance of PermutationTest.
         :param trials: Number of times to run the permutation test.
         :return: New instance of PermutationTest.
         """
         # Load necessary data:
-        self.muts, self.phen = parse.data(phenotype_title=phenotype)
+        self.muts, self.phen = parse.data(phenotype_title=phenotype,
+                                          mutation_title=mutations)
         self.sparse = parse.sparse_mutations()
-        self.sparse = parse.restrict_sparse_mutations(self.sparse, self.phen)
+        self.sparse = parse.restrict_sparse_mutations(self.sparse, self.phen,
+                                                      self.muts)
         self.dag = parse.dag()
 
         # Result list for each mutual information.

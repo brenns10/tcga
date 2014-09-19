@@ -261,7 +261,7 @@ sparse_mutations = _create_pickle_caching_function(parse_sparse_mutations,
                                                    IN_DIR, False)
 
 
-def restrict_sparse_mutations(spmuts, phenotype):
+def restrict_sparse_mutations(spmuts, phenotype, mutations):
     """
     Restrict the sparse mutations to only patients that exist in the
     phenotype data.
@@ -270,7 +270,7 @@ def restrict_sparse_mutations(spmuts, phenotype):
     :return: New sparse mutation list.
     """
     return [(gene, patient) for gene, patient in spmuts if patient in
-            phenotype.index]
+            phenotype.index and gene in mutations]
 
 
 def dag(title='dag-nx-relabeled', dir=IN_DIR):
