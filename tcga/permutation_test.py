@@ -118,7 +118,7 @@ class PermutationTest(Experiment):
         # Result list for each mutual information.
         self.results = []
         # Dictionary of gene count -> list of mutual info's.
-        self.by_gene = {}
+        self.by_gene_count = {}
 
         # This experiment is simply repeated for many trials.  No parameters
         # are varying.
@@ -141,10 +141,9 @@ class PermutationTest(Experiment):
         taskid = config[0]
         rand_muts = randomize_mutations(self.muts, self.sparse)
         dag_copy = self.dag.copy()
-        by_gene = {}
-        dag_pattern_recover(rand_muts, self.phen, dag_copy, by_gene=by_gene)
+        by_gene_count = dag_pattern_recover(rand_muts, self.phen, dag_copy)
         maxroot = get_max_root(dag_copy)
-        return dag_copy.node[maxroot]['mutual_info'], by_gene
+        return dag_copy.node[maxroot]['mutual_info'], by_gene_count
 
     def task_callback(self, retval):
         """
@@ -152,12 +151,12 @@ class PermutationTest(Experiment):
         :param retval: Return value from run_task().
         :return: None
         """
-        mi, by_gene = retval
+        mi, by_gene_count = retval
         # Just add the best MI to the list.
         self.results.append(mi)
         # Append each element of the dictionary to the overall dictionary's
         # lists.
-        for k, v in by_gene.items():
-            l = self.by_gene.get(k, [])
-            l.append(v)
-            self.by_gene[k] = l
+        for gene_count, best_mutual_info in by_gene_count.items():
+            mutual_info_list = self.by_gene_count.get(gene_count, [])
+            mutual_info_list.append(best_mutual_info)
+            self.by_gene_count[gene_count] = mutual_info_list
