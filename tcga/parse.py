@@ -118,7 +118,8 @@ def _create_pickle_caching_function(parse_function, default_title,
     :param source_ext: The file extension of the source format (to be parsed).
     :return: The function described above.
     """
-    def _pickle_caching_function(title=default_title, dir=default_dir):
+    def _pickle_caching_function(title=default_title, dir=default_dir,
+                                 **kwargs):
         """
         Load a data file.  If it has a pickled version, load that.  If not,
         parse its original file, pickle it, and then return it.
@@ -134,9 +135,9 @@ def _create_pickle_caching_function(parse_function, default_title,
 
         # Parse and pickle to the location they loaded from.
         if pass_title:
-            obj = parse_function(title, dir=dir)
+            obj = parse_function(title, dir=dir, **kwargs)
         else:
-            obj = parse_function(dir=dir)
+            obj = parse_function(dir=dir, **kwargs)
         to_pickle(obj, title, dir=dir)
         return obj
     return _pickle_caching_function
