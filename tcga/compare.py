@@ -128,7 +128,8 @@ def log_rank(dataset, phenotype):
 
     summary, p, res = logrank_test(pop1_lifetime, pop2_lifetime,
                                    event_observed_A=pop1_event_observed,
-                                   event_observed_B=pop2_event_observed)
+                                   event_observed_B=pop2_event_observed,
+                                   suppress_print=True)
     return 1 - p
 
 
