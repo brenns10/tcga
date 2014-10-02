@@ -134,7 +134,7 @@ def _initialize_node_attributes(dag):
     # The function chosen at this (internal) node.
     nx.set_node_attributes(dag, 'function', None)
     # The mutual information of this node's dataset with the phenotype.
-    nx.set_node_attributes(dag, 'mutual_info', None)
+    nx.set_node_attributes(dag, 'value', None)
     # The number of genes in the subtree rooted at this node.
     nx.set_node_attributes(dag, 'genes', None)
 
@@ -166,7 +166,7 @@ def _add_parent_nodes(node, dag, node_queue):
             node_queue.appendleft(pred)
 
 
-def _initialize_leaves(muts, phen, dag, by_gene):
+def _initialize_leaves(muts, phen, dag, by_gene, comparison):
     """
     Create a queue initialized with the leaves of the DAG.
 
@@ -194,21 +194,21 @@ def _initialize_leaves(muts, phen, dag, by_gene):
             params['dataset'] = None
         else:
             params['dataset'] = leaf
-            params['mutual_info'] = compare.mutual_info(muts[leaf], phen)
+            params['value'] = comparison(muts[leaf], phen)
         params['visited'] = True
 
         # Set the number of genes in the subtree.
         params['genes'] = 1
 
         # Record the maximum mutual information for a subtree of size 1.
-        _update_max_mutual_info(1, params['mutual_info'], by_gene)
+        _update_max_mutual_info(1, params['value'], by_gene)
 
         _add_parent_nodes(leaf, dag, nodes)
 
     return nodes
 
 
-def _compare_and_set_attributes(curr, dag, muts, phen):
+def _compare_and_set_attributes(curr, dag, muts, phen, comparison):
     """
     Compare the datasets X and Y, and set the attributes of their parent.
 
@@ -244,27 +244,27 @@ def _compare_and_set_attributes(curr, dag, muts, phen):
             params['genes'] = y_params['genes']
             params['dataset'] = y_key
             params['function'] = compare.ds_y
-            params['mutual_info'] = y_params['mutual_info']
+            params['value'] = y_params['value']
     else:
         if y_key is None:
             # X has a dataset, but not Y.
             params['genes'] = x_params['genes']
             params['dataset'] = x_key
             params['function'] = compare.ds_x
-            params['mutual_info'] = x_params['mutual_info']
+            params['value'] = x_params['value']
         else:
             # Both have datasets.  This is the normal case.
             params['genes'] = x_params['genes'] + y_params['genes']
             function, dataset, value, *etc = compare.best_combination(
-                muts[x_key], muts[y_key], phen)
+                muts[x_key], muts[y_key], phen, comparison)
             params['function'] = function
             params['dataset'] = curr
             muts[curr] = dataset
-            params['mutual_info'] = value
+            params['value'] = value
     return value
 
 
-def dag_pattern_recover(muts, phen, dag):
+def dag_pattern_recover(muts, phen, dag, comparison=compare.mutual_info):
     """
     Run the pattern detection algorithm on the given data.
 
@@ -287,7 +287,7 @@ def dag_pattern_recover(muts, phen, dag):
     # Set the node attributes used by this function to default values.
     _initialize_node_attributes(dag)
     # Initialize the leaves and add them to a queue.
-    nodes = _initialize_leaves(muts, phen, dag, by_gene)
+    nodes = _initialize_leaves(muts, phen, dag, by_gene, comparison)
 
     # Do a reverse breadth-first-search, starting at the leaves and working up.
     while nodes:
@@ -297,7 +297,7 @@ def dag_pattern_recover(muts, phen, dag):
         params['visited'] = True
 
         # Perform the comparison (returns mutual information).
-        value = _compare_and_set_attributes(curr, dag, muts, phen)
+        value = _compare_and_set_attributes(curr, dag, muts, phen, comparison)
         # Update the accounting of the best mutual_info.
         _update_max_mutual_info(params['genes'], value, by_gene)
         # Add parents to the queue if they're ready.
@@ -325,7 +325,7 @@ def get_max_root(dag):
     maxmi = 0
     maxroot = None
     for root in get_roots(dag):
-        mi = dag.node[root]['mutual_info']
+        mi = dag.node[root]['value']
         if mi is not None and mi > maxmi:
             maxmi = mi
             maxroot = root

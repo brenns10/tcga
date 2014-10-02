@@ -21,6 +21,7 @@ import random
 
 from .experiment import Experiment
 from .tree import dag_pattern_recover, get_max_root
+from .compare import mutual_info
 from . import parse
 
 
@@ -101,7 +102,7 @@ class PermutationTest(Experiment):
     """
 
     def __init__(self, phenotype='vital-status', mutations='mutations',
-                 trials=1000):
+                 comparison=mutual_info, trials=1000):
         """
         Create an instance of PermutationTest.
         :param trials: Number of times to run the permutation test.
@@ -119,6 +120,8 @@ class PermutationTest(Experiment):
         self.results = []
         # Dictionary of gene count -> list of mutual info's.
         self.by_gene_count = {}
+        # The comparison function to use!
+        self.comparison = comparison
 
         # This experiment is simply repeated for many trials.  No parameters
         # are varying.
@@ -141,9 +144,10 @@ class PermutationTest(Experiment):
         taskid = config[0]
         rand_muts = randomize_mutations(self.muts, self.sparse)
         dag_copy = self.dag.copy()
-        by_gene_count = dag_pattern_recover(rand_muts, self.phen, dag_copy)
+        by_gene_count = dag_pattern_recover(rand_muts, self.phen, dag_copy,
+                                            comparison=self.comparison)
         maxroot = get_max_root(dag_copy)
-        return dag_copy.node[maxroot]['mutual_info'], by_gene_count
+        return dag_copy.node[maxroot]['value'], by_gene_count
 
     def task_callback(self, retval):
         """
