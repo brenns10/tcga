@@ -13,6 +13,7 @@
 import random
 import numpy as np
 from pandas import Series, DataFrame
+from lifelines.statistics import logrank_test
 
 from .util import progress
 
@@ -110,6 +111,26 @@ def compare_mi_methods(ds1, ds2):
                 return False
     return True
 
+################################################################################
+# Log Rank Comparison
+
+def log_rank(dataset, phenotype):
+    pop1 = phenotype[dataset]
+    pop2 = phenotype[~dataset]
+
+    pop1_lifetime = pop1['lifetime']
+    pop1_censored = pop1['censored']
+    pop1_event_observed = ~pop1_censored
+
+    pop2_lifetime = pop2['lifetime']
+    pop2_censored = pop2['censored']
+    pop2_event_observed = ~pop2_censored
+
+    summary, p, res = logrank_test(pop1_lifetime, pop2_lifetime,
+                                   event_observed_A=pop1_event_observed,
+                                   event_observed_B=pop2_event_observed)
+    return 1 - p
+
 
 ################################################################################
 # Boolean functions.  All are designed to take and receive bools, not integers
@@ -156,7 +177,7 @@ def ds_y(x, y):
 COMBINATIONS = [ds_and, ds_or, ds_xor, ds_and_not, ds_not_and, ds_x, ds_y]
 
 
-def best_combination(d1, d2, p):
+def best_combination(d1, d2, p, comparison=mutual_info):
     """
     Find the best boolean combination of d1 and d2 to relate to p.
 
@@ -173,20 +194,20 @@ def best_combination(d1, d2, p):
     [3] the mutual information of the second function
 
     """
-    best_mutual_info = 0
+    best_value = 0
     best_func = None
     best_dataset = None
-    second_best_mutual_info = 0
+    second_value = 0
 
     for func in COMBINATIONS:
         dataset = func(d1, d2)
-        mi = mutual_info(dataset, p)
-        if mi >= best_mutual_info:
-            second_best_mutual_info = best_mutual_info
-            best_mutual_info = mi
+        value = comparison(dataset, p)
+        if value >= best_value:
+            second_value = best_value
+            best_value = value
             best_func = func
             best_dataset = dataset
-    return best_func, best_dataset, best_mutual_info, second_best_mutual_info
+    return best_func, best_dataset, best_value, second_value
 
 
 ################################################################################
