@@ -176,9 +176,10 @@ mutations = _create_pickle_caching_function(parse_mutations, 'mutations',
                                             IN_DIR)
 
 
-def parse_phenotypes(title='vital-status', dir=IN_DIR, ext='.csv', dtype=bool):
+def parse_binary_phenotypes(title='vital-status', dir=IN_DIR, ext='.csv',
+                            dtype=bool):
     """
-    Parse a phenotype CSV and return it as a pandas Series.
+    Parse a binary phenotype CSV and return it as a pandas Series.
     :param title: The title of the file (within dir), default='vital-status'.
     :param dir: The directory of the file, default=IN_DIR.
     :param ext: The file extension, default = '.csv'.
@@ -193,22 +194,65 @@ def parse_phenotypes(title='vital-status', dir=IN_DIR, ext='.csv', dtype=bool):
         return val
 
 
-# Create the utility function 'phenotypes'
-phenotypes = _create_pickle_caching_function(parse_phenotypes,
-                                             'vital-status', IN_DIR)
+def parse_lifetime_phenotypes(title='lifetime', dir=IN_DIR, ext='.csv'):
+    """
+    Parse a lifetime phenotype CSV and return it as a pandas DataFrame.
+    :param title: Title of the file
+    :param dir: Directory (default IN_DIR).
+    :param ext: Extension (csv)
+    :return: Lifetime DataFrame
+    """
+    filename = _process_title(title, dir, ext)
+    df = pd.read_csv(filename, index_col=0, squeeze=True)
+    df['censored'] = df['censored'] == 'True'  # Convert from strings
+    df = df.convert_objects(convert_numeric=True)
+    return df
+
+
+def _get_phenotype_parser(filename):
+    """
+    Return the correct parser function for a phenotype file.  Reads the CSV
+    and uses the number of fields to determine.
+    :param filename: Filename
+    :return: Parser function
+    """
+    with open(filename) as f:
+        r = csv.reader(f)
+        header = next(r)
+        if len(header) == 2:
+            return parse_binary_phenotypes
+        elif len(header) == 3:
+            return parse_lifetime_phenotypes
+
+
+def phenotypes(title='vital-status', dir=IN_DIR, ext='.csv', **kwargs):
+    """
+    Get phenotype data with the given title.  Cache as pickle for future use.
+    Determines what type of phenotype by the contents of the file.
+    :param title: Title (i.e. filename w/o extension or directory)
+    :param dir: Directory (default to input directory)
+    :param ext: Extension (default to csv)
+    :param kwargs: Arguments to pass to the parser function
+    :return: The phenotype data file.
+    """
+    filename = _process_title(title, dir, ext)
+    pickle_name = _process_title(title, dir, '.pickle')
+
+    if isfile(pickle_name):
+        return unpickle(title, dir)
+
+    parser = _get_phenotype_parser(filename)
+    data = parser(title, dir, ext, **kwargs)
+    to_pickle(data, title, dir=dir)
+    return data
 
 
 def reindex(muts, phen):
     """
     Handle differing indices between the mutation and phenotype data.
 
-    Patients which exist in the phenotype data, but not in the mutation data,
-    are likely patients who had no mutations, and were left out of the sparse
-    data file.  Patients which exist in the mutation data, but not the
-    phenotype data probably lack data for that particular phenotype,
-    and should be removed.  Therefore, the mutation dataset should be
-    reindexed by the phenotype dataset, to only include those patients which
-    appear in the phenotype.
+    Make sure we only use the patients for which we have both mutation data
+    and phenotype data.
 
     :param muts: The mutation dataset (pandas DataFrame)
     :param phen: The phenotype dataset (pandas Series)
@@ -216,7 +260,9 @@ def reindex(muts, phen):
     [0]: modified mutations dataframe
     [1]: modified phenotypes dataframe
     """
-    muts = muts.reindex(index=phen.index, fill_value=False)
+    new_index = muts.index.intersection(phen.index)
+    muts = muts.reindex(index=new_index)
+    phen = phen.reindex(index=new_index)
     return muts, phen
 
 
