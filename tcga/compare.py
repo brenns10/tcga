@@ -118,6 +118,9 @@ def log_rank(dataset, phenotype):
     pop1 = phenotype[dataset]
     pop2 = phenotype[~dataset]
 
+    if len(pop1) == 0 or len(pop2) == 0:
+        return 0  # This is a failed test!
+
     pop1_lifetime = pop1['lifetime']
     pop1_censored = pop1['censored']
     pop1_event_observed = ~pop1_censored
