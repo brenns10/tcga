@@ -133,7 +133,7 @@ def log_rank(dataset, phenotype):
                                    event_observed_A=pop1_event_observed,
                                    event_observed_B=pop2_event_observed,
                                    suppress_print=True)
-    return 1 - p
+    return - np.log(p)
 
 
 ################################################################################
