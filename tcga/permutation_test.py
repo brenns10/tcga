@@ -20,6 +20,7 @@
 import random
 
 from .experiment import Experiment
+from tcga import compare
 from .tree import dag_pattern_recover, get_max_root
 from .compare import mutual_info
 from . import parse
@@ -164,3 +165,93 @@ class PermutationTest(Experiment):
             mutual_info_list = self.by_gene_count.get(gene_count, [])
             mutual_info_list.append(best_mutual_info)
             self.by_gene_count[gene_count] = mutual_info_list
+
+
+class LifetimePermutationTest(Experiment):
+    """
+    Permutation Test to determine whether lifetime data produces interesting
+    splits and P-values.
+
+    This experiment does the following task many times: create a randomn,
+    dataset similar to the real mutations dataset.  Run dag_patern_recover
+    using the log_rank comparison.  Look at the dag produced.  Find how many
+    nodes in the dag have splits greater than MIN_SPLIT, how many have -log(
+    p) greater than MIN_NLGP.
+
+    These numbers can be compared to the numbers obtained from the real data
+    to see if there is much of a difference.
+    """
+
+    MIN_SPLIT = 25
+    MIN_NLOGP = 25
+
+    def __init__(self, phenotype='lifetime', mutations='mutations',
+                 trials=1000):
+        """
+        Create an instance of LifetimePermutationTest.
+        :param trials: Number of times to run the permutation test.
+        :return: New instance of LifetimePermutationTest.
+        """
+        # Load necessary data:
+        self.muts, self.phen = parse.data(phenotype_title=phenotype,
+                                          mutation_title=mutations)
+        self.sparse = parse.sparse_mutations()
+        self.sparse = parse.restrict_sparse_mutations(self.sparse, self.phen,
+                                                      self.muts)
+        self.dag = parse.dag()
+
+        # Result list for each mutual information.
+        self.good_p = []
+        self.good_split = []
+        # The comparison function to use!
+        self.comparison = compare.log_rank
+
+        # This experiment is simply repeated for many trials.  No parameters
+        # are varying.
+        self.params['Trial'] = range(trials)
+        self.trials = trials
+
+    def run_task(self, config):
+        """
+        Task that is repeated for each trial.
+
+        Generate a random mutation dataset.  Run the dag_pattern_recover()
+        function using the random dataset, along with the original phenotype
+        and DAG.
+        :param config: Variable containing the parameters (in this case,
+        just the trial number).
+        :return: A 2-tuple:
+        [0] Mutual information of the best root.
+        [1] Dictionary of best mutual info by number of genes in subtree.
+        """
+        rand_muts = randomize_mutations(self.muts, self.sparse)
+        dag_copy = self.dag.copy()
+        by_gene_count = dag_pattern_recover(rand_muts, self.phen, dag_copy,
+                                            comparison=self.comparison)
+        good_p = 0
+        good_split = 0
+        for node in dag_copy.nodes_iter():
+            dataset = dag_copy.node[node]['dataset']
+            p_value = dag_copy.node[node]['value']
+
+            if not dataset:
+                continue
+
+            if p_value > self.MIN_NLOGP:
+                good_p += 1
+
+            if rand_muts[dataset].sum() > self.MIN_SPLIT:
+                good_split += 1
+
+        return good_p, good_split
+
+    def task_callback(self, retval):
+        """
+        Store the data from the task.  Executed on main process.
+        :param retval: Return value from run_task().
+        :return: None
+        """
+        good_p, good_split = retval
+        # Just add the best MI to the list.
+        self.good_p.append(good_p)
+        self.good_split.append(good_split)
