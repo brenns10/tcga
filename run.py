@@ -1,36 +1,12 @@
 #!/usr/bin/env python3
-#-------------------------------------------------------------------------------
-#
-# File:         run.py
-#
-# Author:       Stephen Brennan
-#
-# Date Created: Tuesday, 24 June 2014
-#
-# Description:  Contains menu for running various tasks in the TCGA package.
-#
-#-------------------------------------------------------------------------------
+"""Contains menu for running various tasks in the TCGA package."""
 
 from os.path import expandvars, expanduser
 
-from tcga import parse, tree, util, compare
+from tcga import parse, util
 
 main = util.Menu(title='TCGA Procedures', reentrant=True)
 state = {'muts': None, 'phen': None}
-
-
-@main.add_function('Detection by Dataset Size')
-def run_detection_by_size():
-    """Run collect_detection_data."""
-    res = compare.collect_detection_data()
-    check_save(res)
-
-
-@main.add_function('Detection by Data Distribution')
-def run_detection_by_distribution():
-    """Run detection_by_distribution."""
-    res = compare.detection_by_distribution()
-    check_save(res)
 
 
 def check_save(data):
