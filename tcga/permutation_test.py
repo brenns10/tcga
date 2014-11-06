@@ -218,7 +218,7 @@ class LifetimePermutationTest(Experiment):
 
         nodes = list(terminal_function_nodes(dag_copy))
         values = [0] * len(nodes)
-        for i, node in nodes:
+        for i, node in enumerate(nodes):
             values[i] = dag_copy.node[node]['value']
         values.sort(reverse=True)
         return values[:self.ranks]
