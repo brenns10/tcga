@@ -1,30 +1,21 @@
-#-------------------------------------------------------------------------------
-# 
-# File:         parse.py
-#
-# Author:       Stephen Brennan, Matthew Ruffalo
-#
-# Date Created: Tuesday,  3 June 2014
-#
-# Description:  Contains functions for parsing, saving, and loading data.
-#
-# This module operates on the idea of one central directory where all your
-# input data is stored, and another central directory for your output data.
-# The variables are IN_DIR and OUT_DIR, which are by default '~/data' and
-# '~/results'.
-#
-# Furthermore, the idea of this module is that you should be able to
-# reference your data by title, rather than typing out a filename.  So,
-# if you have a Pickled data file named ~/data/mutations.pickle, you can
-# simply load it by passing the title 'mutations', and the code will take it
-# from there.
-#
-# Finally, this module makes the assumption that loading pickled data is
-# better than parsing data.  So, it provides functions that access each type
-# of data, first by looking for a pickled copy, and then by parsing it and
-# pickling it, if the piclked copy did not exist.
-#
-#-------------------------------------------------------------------------------
+"""Contains functions for parsing, saving, and loading data.
+
+This module operates on the idea of one central directory where all your
+input data is stored, and another central directory for your output data.
+The variables are IN_DIR and OUT_DIR, which are by default '~/data' and
+'~/results'.
+
+Furthermore, the idea of this module is that you should be able to
+reference your data by title, rather than typing out a filename.  So,
+if you have a Pickled data file named ~/data/mutations.pickle, you can
+simply load it by passing the title 'mutations', and the code will take it
+from there.
+
+Finally, this module makes the assumption that loading pickled data is
+better than parsing data.  So, it provides functions that access each type
+of data, first by looking for a pickled copy, and then by parsing it and
+pickling it, if the piclked copy did not exist.
+"""
 
 import csv
 from os.path import expanduser, expandvars, join, exists, isfile
