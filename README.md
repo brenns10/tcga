@@ -5,9 +5,9 @@ Summary
 -------
 
 This package implements an algorithm which uses existing biological knowledge
-to assist in determining the best binary function to explain a phenotype 
-variable, using somatic mutation data.  The existing biological knowledge is 
-presented in a binary DAG form of a gene ontology.  
+to assist in determining the best binary function of somatic mutations to 
+explain a phenotype variable.  The existing biological knowledge is presented
+in a binary DAG form of a gene ontology.  
 
 The package allows for using a variety of phenotypes and objective functions 
 to guide the search.  The currently implemented choices are:
