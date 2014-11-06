@@ -21,7 +21,8 @@ import random
 
 from .experiment import Experiment
 from tcga import compare
-from .tree import dag_pattern_recover, get_max_root
+from tcga.pattern import dag_pattern_recover
+from .tree import get_max_root
 from .compare import mutual_info
 from . import parse
 
