@@ -1,33 +1,26 @@
-#-------------------------------------------------------------------------------
-# 
-# File:         compare.py
-#
-# Author:       Stephen Brennan
-#
-# Date Created: Wednesday,  4 June 2014
-#
-# Description:  Contains functions to compare binary data sets.
-#
-#-------------------------------------------------------------------------------
+"""Contains objective functions for use with tcga.pattern.dag_pattern_recover().
+
+Objective functions for dag_pattern_recover() take two arguments: the first
+is the node dataset, and the second is the phenotype dataset.  The objective
+functions should return a number that will be *maximized* by the procedure.
+"""
 
 import random
+
 import numpy as np
 from pandas import Series, DataFrame
 from lifelines.statistics import logrank_test
 
 from .util import progress
 
-################################################################################
-# Mutual information / Entropy calculation
 
-
-def entropy(ds, domain=(0, 1)):
+def _entropy(ds, domain=(0, 1)):
     """
-    Computes the entropy (in bits) of a dataset.
+    Computes the _entropy (in bits) of a dataset.
 
-    :param ds: The dataset to compute the entropy of.
+    :param ds: The dataset to compute the _entropy of.
     :param domain: The domain of the dataset.
-    :return: The entropy of the dataset, in bits.
+    :return: The _entropy of the dataset, in bits.
     """
     currentropy = 0
     total = len(ds)
@@ -38,15 +31,15 @@ def entropy(ds, domain=(0, 1)):
     return currentropy
 
 
-def conditional_entropy(ds, cs, ds_domain=(0, 1), cs_domain=(0, 1)):
+def _conditional_entropy(ds, cs, ds_domain=(0, 1), cs_domain=(0, 1)):
     """
-    Computes the conditional entropy of ds given cs, AKA H(ds|cs), in bits.
+    Computes the conditional _entropy of ds given cs, AKA H(ds|cs), in bits.
 
     :param ds: The non-conditioned dataset (eg. X in H(X|Y)).
     :param cs: The conditioned dataset. (eg. Y in H(X|Y)).
     :param ds_domain: The domain of the non-conditioned dataset.
     :param cs_domain: The domain of the conditioned dataset.
-    :return: The conditional entropy of ds given cs, AKA H(ds|cs), in bits.
+    :return: The conditional _entropy of ds given cs, AKA H(ds|cs), in bits.
     """
     currentropy = 0
     total = len(ds)
@@ -73,46 +66,10 @@ def mutual_info(ds1, ds2, ds1domain=2, ds2domain=2):
     :return: The mutual information between the two datasets.
     """
     combined = ds1 + ds2 * ds1domain
-    return entropy(ds1, domain=range(ds1domain)) + \
-           entropy(ds2, domain=range(ds2domain)) - \
-           entropy(combined, domain=range(ds1domain * ds2domain))
+    return _entropy(ds1, domain=range(ds1domain)) + \
+           _entropy(ds2, domain=range(ds2domain)) - \
+           _entropy(combined, domain=range(ds1domain * ds2domain))
 
-
-def compare_mi_methods(ds1, ds2):
-    """
-    Computes binary mutual information multiple ways and compares.
-
-    Uses the direct formula (binary_mutual_information()), as well as the
-    following formulas which use entropy:
-    * H(X) - H(X|Y)
-    * H(Y) - H(Y|X)
-    * H(X) + H(Y) - H(X,Y)
-    * H(X,Y) - H(X|Y) - H(Y|X)
-    Returns False if the mutual information functions do not return the same
-    values (within floating point error).
-
-    :param ds1: The first dataset to compute mutual information with.
-    :param ds2: The second dataset to compute mutual information with.
-    :return: False if the comparison fails, True otherwise.
-    """
-    combined = ds1 + ds2 * 2
-    results = [
-        entropy(ds1) - conditional_entropy(ds1, ds2),
-
-        entropy(ds2) - conditional_entropy(ds2, ds1),
-
-        entropy(ds1) + entropy(ds2) - entropy(combined, domain=[0, 1, 2, 3]),
-
-        mutual_info(ds1, ds2)
-    ]
-    for r1 in results:
-        for r2 in results:
-            if not np.isclose([r1], [r2]):
-                return False
-    return True
-
-################################################################################
-# Log Rank Comparison
 
 def log_rank(dataset, phenotype):
     pop1 = phenotype[dataset]
@@ -135,10 +92,6 @@ def log_rank(dataset, phenotype):
                                    suppress_print=True)
     return - np.log(p)
 
-
-################################################################################
-# Boolean functions.  All are designed to take and receive bools, not integers
-# (though it wouldn't take much to change that).
 
 # ~ 99 microseconds
 def ds_and(x, y):
@@ -183,14 +136,12 @@ COMBINATIONS = [ds_and, ds_or, ds_xor, ds_and_not, ds_not_and, ds_x, ds_y]
 
 def best_combination(d1, d2, p, comparison=mutual_info):
     """
-    Find the best boolean combination of d1 and d2 to relate to p.
-
-    Uses mutual information to find the best boolean function between d1 and d2
-    to relate to p.
+    Find the best binary function of d1 and d2 to maximize comparison.
 
     :param d1: First dataset.
     :param d2: Second dataset.
     :param p: Phenotype dataset to correlate to a boolean function of d1 and d2.
+    :param comparison: The objective function to use.
     :return: A four-tuple:
     [0] the best boolean function
     [1] the resulting dataset

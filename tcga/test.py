@@ -87,28 +87,28 @@ class TestMutualInfo(unittest.TestCase):
 class TestEntropy(unittest.TestCase):
 
     def test_trivial_zero_case(self):
-        """Tests homogeneous data where entropy is zero."""
+        """Tests homogeneous data where _entropy is zero."""
         first = Series([True, True, True, True])
         second = Series([False, False, False, False])
         
-        self.assertEqual(compare.entropy(first), 0)
-        self.assertEqual(compare.entropy(second), 0)
+        self.assertEqual(compare._entropy(first), 0)
+        self.assertEqual(compare._entropy(second), 0)
 
     def test_trivial_one_case(self):
-        """Tests uniformly distributed data where entropy is one."""
+        """Tests uniformly distributed data where _entropy is one."""
         data = Series([True, True, False, False])
-        self.assertEqual(compare.entropy(data), 1)
+        self.assertEqual(compare._entropy(data), 1)
 
     def test_basic_case(self):
-        """Tests a basic case where the entropy is not zero or one."""
+        """Tests a basic case where the _entropy is not zero or one."""
         dataset1 = Series([True, True, True, False])
         dataset2 = Series([False, False, False, True])
         # H(data) = -.25*log_2(.25) - 0.75*log_2(.75)
         # H(data) = 0.5 + 0.31127812445913283
         # H(data) = 0.81127812445913283
-        self.assertTrue(np.isclose([compare.entropy(dataset1)],
+        self.assertTrue(np.isclose([compare._entropy(dataset1)],
                                    [0.81127812445913283]))
-        self.assertTrue(np.isclose([compare.entropy(dataset2)],
+        self.assertTrue(np.isclose([compare._entropy(dataset2)],
                                    [0.81127812445913283]))
 
 
