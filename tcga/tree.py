@@ -153,3 +153,44 @@ def count_disconnected(dag):
                     for succ in dag.neighbors(curr):
                         q.appendleft(succ)
     return count
+
+
+def terminal_function_nodes(dag):
+    """
+    A generator that takes a DAG and yields 'terminal function nodes'.
+
+    A terminal function node is a node that is at the root of a completed
+    function.  A function can be completed either by:
+      1. Being at the root of a tree in the DAG.
+      2. Being ignored by its parent.
+    :param dag: The DAG, processed by dag_pattern_recover().
+    :return: Yields terminal function nodes.
+    """
+
+    for node in dag.nodes_iter():
+
+        # We should ignore any node that has no objective function value.
+        if dag.node[node]['value'] is None:
+            continue
+
+        # Node is terminal if it has no parent (is root).
+        if len(dag.predecessors(node)) == 0:
+            yield node
+
+        # Node is terminal if it is being 'ignored' by its parent.
+        for parent in dag.predecessors(node):
+
+            # If the node is X, and the parent is using ds_y, then the parent
+            # is 'ignoring' the node.
+            if node == dag.successors(parent)[0] and \
+                    dag.node[parent]['function'] == 'ds_y':
+
+                yield node
+                break  # Don't double report a node.
+
+            # Similarly for Y.
+            elif node == dag.successors(parent)[1] and \
+                    dag.node[parent]['function'] == 'ds_y':
+
+                yield node
+                break  # Don't double report a node.
