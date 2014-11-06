@@ -191,7 +191,7 @@ class LifetimePermutationTest(Experiment):
         self.ranks = ranks
 
         # Result list for each mutual information.
-        self.results = [[]] * ranks
+        self.results = [[] for _ in range(ranks)]
         # The comparison function to use!
         self.comparison = compare.log_rank
 
@@ -216,10 +216,10 @@ class LifetimePermutationTest(Experiment):
         by_gene_count = dag_pattern_recover(rand_muts, self.phen, dag_copy,
                                             comparison=self.comparison)
 
-        nodes = list(terminal_function_nodes(dag_copy))
-        # We include parameter d to 'capture' the variable dag_copy.
-        nodes.sort(key=lambda x, d=dag_copy: d.node[x]['value'], reverse=True)
-        return nodes[:self.ranks]
+        values = [dag_copy.node[x]['value'] for x in terminal_function_nodes(
+            dag_copy)]
+        values.sort(reverse=True)
+        return values[:self.ranks]
 
 
     def task_callback(self, retval):
