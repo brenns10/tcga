@@ -1,26 +1,14 @@
-#-------------------------------------------------------------------------------
-#
-# File:         util.py
-#
-# Author:       Stephen Brennan
-#
-# Date Created: Tuesday, 17 June 2014
-#
-# Description:  Contains useful functions and classes.
-#
-#-------------------------------------------------------------------------------
+"""Contains useful functions and classes."""
 
 import traceback
 from types import FunctionType
-
-__author__ = 'Stephen Brennan <stephen.brennan@case.edu>'
-
 from io import StringIO
 from enum import Enum
 import sys
 
 
 class TermType(Enum):
+    """Enumeration of types of terminals."""
     TTY = 1
     IPythonTerminal = 2
     IPythonGUI = 3
