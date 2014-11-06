@@ -5,6 +5,7 @@ from os.path import expandvars, expanduser
 
 from tcga import parse, util
 
+
 main = util.Menu(title='TCGA Procedures', reentrant=True)
 state = {'muts': None, 'phen': None}
 
