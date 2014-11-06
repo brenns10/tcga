@@ -1,14 +1,4 @@
-#-------------------------------------------------------------------------------
-#
-# File:         compare.py
-#
-# Author:       Stephen Brennan
-#
-# Date Created: Wednesday,  4 June 2014
-#
-# Description:  Contains functions to compare binary data sets.
-#
-#-------------------------------------------------------------------------------
+"""Contains the Experiment class."""
 
 import itertools as it
 import multiprocessing as mp
