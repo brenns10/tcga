@@ -204,7 +204,6 @@ def parse_lifetime_phenotypes(title='lifetime', dir=IN_DIR, ext='.csv'):
     """
     filename = _process_title(title, dir, ext)
     df = pd.read_csv(filename, index_col=0, squeeze=True)
-    df['censored'] = df['censored'] == 'True'  # Convert from strings
     df = df.convert_objects(convert_numeric=True)
     return df
 
