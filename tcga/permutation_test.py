@@ -217,8 +217,7 @@ class LifetimePermutationTest(Experiment):
                                             comparison=self.comparison)
 
         nodes = list(terminal_function_nodes(dag_copy))
-        nodes.sort(lambda x, y: dag_copy.node[x]['value'] -
-                                dag_copy.node[y]['value'])
+        nodes.sort(key=lambda x: dag_copy.node[x]['value'])
         return nodes[:self.ranks]
 
 
