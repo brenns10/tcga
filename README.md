@@ -83,3 +83,9 @@ The CLI made heavy use of utilities in the `util` module.  Many of them are
 useful for creating the actual command line interface, and have nothing to do
 with the pattern recovery algorithm itself.  These utilities may also be 
 removed, or extracted into their own library.
+
+Info
+----
+
+* Author: Stephen Brennan <stephen.brennan@case.edu>
+* Advisors: Mehmet Koyuturk, Matthew Ruffalo
