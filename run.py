@@ -33,15 +33,6 @@ def run_detection_by_distribution():
     check_save(res)
 
 
-@main.add_function('Random Tree')
-def run_random_tree():
-    """Run the random tree algorithm."""
-    check_data()
-    depth = util.repeat_input(prompt='Depth: ', in_type=int)
-    print('Beginning \'random_tree\'.')
-    tree.random_tree(state['muts'], state['phen'], depth)
-
-
 def check_save(data):
     """Ask if the user would like to save a CSV."""
     response = util.repeat_input('Save? ', str)

@@ -1,16 +1,9 @@
-#-------------------------------------------------------------------------------
-# 
-# File:         tree.py
-#
-# Author:       Stephen Brennan
-#
-# Date Created: Wednesday,  4 June 2014
-#
-# Description:  Chooses best binary functions on trees.
-#
-#-------------------------------------------------------------------------------
+"""Tree and DAG related functions.
 
-import random
+This module contains functions useful for examining the DAG produced by
+tcga.pattern.dag_pattern_recover().
+"""
+
 import collections
 
 import networkx as nx
@@ -62,65 +55,6 @@ DS_TO_SYM = {
 }
 
 
-def random_tree(muts, phen, depth, verbose=True, simplify=False):
-    """Create a boolean expression for a random tree of genes.
-
-    For the given mutation and phenotype data, construct a random tree/ontology
-    of genes, and find the boolean expression that best relates the mutations to
-    the phenotype.  Returns the SymPy expression generated.
-
-    muts - Mutation data in a pandas DataFrame
-    phen - Phenotype data in a pandas Series
-    depth - The depth of the tree.  Must be >=1
-    verbose - Print info about what is happening
-    simplify - Do we simplify the expression before returning (can be lengthy)
-    """
-    # Create a random sample from the entire list of possible genes
-    if verbose:
-        print("Selecting gene sample ...")
-    choices = iter(random.sample(range(len(muts.columns)), depth + 1))
-
-    # Get two genes from the sample (as string names).
-    firststr = muts.columns[next(choices)]
-    secondstr = muts.columns[next(choices)]
-
-    # Create SymPy symbols from the gene names
-    firstsym = s.Symbol('[' + firststr + ']')
-    secondsym = s.Symbol('[' + secondstr + ']')
-
-    # Get the actual Series for each gene
-    first = muts[firststr]
-    second = muts[secondstr]
-
-    # Choose our first combination
-    print("Choosing between %s and %s." % (firststr, secondstr))
-    func, prev, mi1, mi2 = compare.best_combination(first, second, phen)
-    print("Selecting %s, MI=%f, by margin of %f." % (
-        func.__name__, mi1, mi1 - mi2))
-
-    # Construct an expression using the function returned
-    expr = DS_TO_SYM[func](firstsym, secondsym)
-
-    # Now, begin the loop for the rest of the random tree.  In each iteration,
-    # get the next gene from the random sample, find the best combination with
-    # the existing dataset function, and add it to the result expression.
-    for curr in choices:
-        currstr = muts.columns[curr]
-        print("=> Adding %s." % currstr)
-        currdataset = muts[currstr]
-        func, prev, mi1, mi2 = compare.best_combination(prev, currdataset, phen)
-        print("   Selecting %s, MI=%f, by margin of %f." % (
-            func.__name__, mi1, mi1 - mi2))
-        expr = DS_TO_SYM[func](expr, s.Symbol('[' + currstr + ']'))
-
-    if simplify:
-        expr = s.simplify_logic(expr, 'dnf')
-    if verbose:
-        print('Expression constructed:')
-        s.pprint(expr)
-    return expr
-
-
 def get_roots(dag):
     """
     Returns the roots of a forest of DAGs.
@@ -132,11 +66,11 @@ def get_roots(dag):
 
 def get_max_root(dag):
     """
-    Return the DAG root that has the highest mutual information associated
-    with it (after calling dag_pattern_reover() on the DAG).
+    Return the DAG root that has the highest objective function value associated
+    with it (after calling dag_pattern_recover() on the DAG).
     :param dag: The NetworkX DAG, which has already had dag_pattern_recover()
     called on it.
-    :return: The root with the highest mutual information.
+    :return: The root with the highest objective function value.
     """
     maxmi = 0
     maxroot = None
