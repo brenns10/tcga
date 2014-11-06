@@ -216,8 +216,10 @@ class LifetimePermutationTest(Experiment):
         by_gene_count = dag_pattern_recover(rand_muts, self.phen, dag_copy,
                                             comparison=self.comparison)
 
-        values = [dag_copy.node[x]['value'] for x in terminal_function_nodes(
-            dag_copy)]
+        nodes = list(terminal_function_nodes(dag_copy))
+        values = [0] * len(nodes)
+        for i, node in nodes:
+            values[i] = dag_copy.node[node]['value']
         values.sort(reverse=True)
         return values[:self.ranks]
 
