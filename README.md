@@ -1,65 +1,85 @@
-# TCGA Data Analysis Package
+TCGA Data Analysis Package
+==========================
 
-## Summary
+Summary
+-------
 
-This package parses and performs data analysis on binary gene mutation data.  It
-uses mutual information calculations to determine the best binary function to
-relate mutation data from two genes to a binary phenotype, such as vital status.
+This package implements an algorithm which uses existing biological knowledge
+to assist in determining the best binary function to explain a phenotype 
+variable, using somatic mutation data.  The existing biological knowledge is 
+presented in a binary DAG form of a gene ontology.  
 
-In order to reduce the search space, a binarized gene ontology will be used.
-Binary functions will be evaluated up the tree.
+The package allows for using a variety of phenotypes and objective functions 
+to guide the search.  The currently implemented choices are:
 
-## Dependencies
+* Patient lifetime as a phenotype, using the log rank test for the objective 
+  function.
+* Any binary phenotype (e.g. vital status), using mutual information as the 
+  objective function.
+  
+More phenotypes and objective functions may be added readily, 
+as discussed below.
 
-- Python 3 (currently using latest, 3.4)
-- Pandas
-- NumPy
-- SymPy
+Project Technologies and Dependencies
+-------------------------------------
 
-## Unit Tests
+* Python 3
+* [Pandas](https://pypi.python.org/pypi/pandas)
+* [NumPy](https://pypi.python.org/pypi/numpy)
+* [SymPy](https://pypi.python.org/pypi/sympy) (to present symbolic 
+  representations of binary functions)
+* [NetworkX](https://pypi.python.org/pypi/networkx) (to store the binary DAG)
+* [Lifelines](https://pypi.python.org/pypi/lifelines) (for log rank test)
 
-Unit tests are in tcga/test.py.  They can be run with the command:
+Structure
+---------
 
-```
-#!bash
-$ python -m unittest tcga.test
-```
+### Framework
 
-You need to be in the same directory as this file in order to run the unit tests.  
-They will not run from inside the module.
+The framework of the pattern recovery algorithm is contained within the modules:
 
-## Important Functions
+* `tcga.pattern`: This module contains the actual implementation of the 
+  pattern recovery algorithm.  Its only function is
+  `tcga.pattern.dag_pattern_recover()`.
+* `tcga.compare`: Contains objective functions for the pattern recovery 
+  algorithm.  New objective functions should be modeled after those in this 
+  package.
 
-This package is first and foremost a collection of functions, not a program.
-The important functions/objects are:
+### Utilities
 
-- `tcga.parse.data(mutationsLoc, phenotypesLoc)`: Imports data from the two
-  files, and restricts the data to only patients that occur in both data frames.
+The previous set of packages leaves much to be desired in terms of usability.
+The next group of packages simplify working with the framework.
 
-- `tcga.compare.binary_mutual_information(dataSet1, dataSet2)`: Calculates the
-  mutual information between two binary variables.
+* `tcga.parse`: This module, at a minimum, simplifies parsing data stored as 
+  files.  When used to its full extent, the module creates an entire 
+  framework for working with Python data on the filesystem.  The benefits of 
+  the approach are speed (by 'caching' parsed data as pickles) and brevity 
+  (refer to data on the filesystem by a title, rather than full file path).
+  See its documentation for more details.
+* `tcga.tree`: This module provides convenient functions for examining the 
+  DAG, after it has been modified by `dag_pattern_recover()`.
 
-- `tcga.compare.entropy(dataSet, domain=[0,1])`: Calculates the entropy of a
-  single (by default binary) variable.
+### Experiments
 
-- `tcga.compare.entropy(dataSet, conditionSet, dsDomain=[0,1], csDomain=[0,1])`:
-  Calculates conditional entropy of one dataset given another.
+In order to learn about the algorithm, and to use it on real data, 
+an experiment abstraction is provided.  The abstraction allows for tasks to 
+be repeated over many configurations.  Experiments created using this 
+abstraction may be run concurrently using the Python standard 
+library `multiprocessing` module, allowing for huge performance gains on 
+multi-core systems.
 
-- `tcga.compare.ds***`: Functions representing boolean combinations of datasets.
+The `Experiment` abstraction is provided in the `experiment` module.  
+Existing experiments are implemented in `detection_experiment` and 
+`permutation_test`.
 
-- `tcga.compare.COMBINATIONS`: A list of binary functions we check.
+### Miscellaneous
 
-- `tcga.compare.best_combination(d1, d2, p)`: Determines the best binary
-  function (or combination) of two variables to correlate to a phenotype `p`,
-  using the mutual information function.
+Before the existence of the Experiment abstraction, this module had a command
+line interface (`run.py`) to streamline running tests.  However, 
+experiments are most easily run within an IPython shell.  The CLI may be 
+removed in the future (it is empty currently).
 
-- `tcga.compare.reclaim_pattern(size, function, proportion)`: Creates random
-  datasets of size `size`, implants a pattern (`function`) with the given
-  proportion `proportion`.  Then, returns true if `best_combination()` returns
-  the function implanted.
-
-- `tcga.tree.sym***`: Functions representing boolean combinations of SymPy
-  expressions.
-
-- `tcga.tree.randTree(muts, phen, depth, verbose=True, simplify=False)`:
-  Determines boolean expressions on a randomly generated, sequential tree.
+The CLI made heavy use of utilities in the `util` module.  Many of them are 
+useful for creating the actual command line interface, and have nothing to do
+with the pattern recovery algorithm itself.  These utilities may also be 
+removed, or extracted into their own library.
