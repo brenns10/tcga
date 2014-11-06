@@ -1,21 +1,12 @@
-#-------------------------------------------------------------------------------
-#
-# File:         permutation_test.py
-#
-# Author:       Stephen Brennan
-#
-# Date Created: Thursday, 28 August 2014
-#
-# Description:  Contains PermutationTest class and assorted functions.
-#
-# The PermutationTest is a subclass of Experiment, which means it can be
-# multiprocessed very well.  The PermutationTest randomizes the mutation
-# dataset, and then records the results of dag_pattern_recover() using this
-# mutation dataset.  Its purpose is to establish whether the result of
-# running dag_pattern_recover() on the real mutation dataset is significant
-# or not.
-#
-#-------------------------------------------------------------------------------
+"""Contains PermutationTest class and assorted functions.
+
+The PermutationTest is a subclass of Experiment, which means it can be
+multiprocessed very well.  The PermutationTest randomizes the mutation
+dataset, and then records the results of dag_pattern_recover() using this
+mutation dataset.  Its purpose is to establish whether the result of
+running dag_pattern_recover() on the real mutation dataset is significant
+or not.
+"""
 
 import random
 
