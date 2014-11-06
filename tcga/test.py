@@ -1,14 +1,4 @@
-#-------------------------------------------------------------------------------
-# 
-# File:         test.py
-#
-# Author:       Stephen Brennan
-#
-# Date Created: Tuesday, 10 June 2014
-#
-# Description:  Unit tests for TCGA package.
-#
-#-------------------------------------------------------------------------------
+"""Unit tests for TCGA package."""
 
 import unittest
 
