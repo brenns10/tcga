@@ -118,7 +118,7 @@ class PermutationTest(Experiment):
         # Result list for each mutual information.
         self.results = [[] for _ in range(ranks)]
         # The comparison function to use!
-        self.comparison = compare.log_rank
+        self.comparison = comparison
 
         # This experiment is simply repeated for many trials.  No parameters
         # are varying.
