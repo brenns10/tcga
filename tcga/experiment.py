@@ -22,37 +22,14 @@ class Experiment:
     """
     __metaclass__ = ABCMeta
 
-    params = OrderedDict()
-    completed = 0
-    num_configs = 0
-    progress = None
-
-    @staticmethod
-    def _dataframe_append(dataframe, rowdict):
-        """
-        Shortcut method for appending a row to a DataFrame.
-        :param dataframe: The DataFrame to append to.
-        :param rowdict: A dictionary containing each column's value.
-        """
-        newrow = len(dataframe)
-        dataframe.loc[newrow] = 0  # init with 0's
-        for k, v in rowdict.items():
-            dataframe.loc[newrow, k] = v
-
-    @staticmethod
-    def error_callback(exception):
-        """
-        Error callback for multiprocessing.
-
-        This function 'handles' exceptions from Processes by displaying them.
-        The run_config_wrapped() function puts tracebacks into the
-        exceptions, so that printing them here is actually meaningful.
-        :param exception: The exception thrown by run_config()
-        """
-        print(exception)
+    def __init__(self, silent=False):
+        self._silent = silent
+        self._params = OrderedDict()
+        self.__completed = 0
+        self.__num_configs = 0
 
     @abstractmethod
-    def run_task(self, configuration):
+    def task(self, configuration):
         """
         This function must be the task that is run for every configuration.
 
@@ -65,7 +42,7 @@ class Experiment:
         pass
 
     @abstractmethod
-    def task_callback(self, retval):
+    def result(self, retval):
         """
         This function should save the data created by each task.
 
@@ -77,7 +54,23 @@ class Experiment:
         """
         pass
 
-    def initial_task_callback(self, retval):
+    def configs(self):
+        """Return an iterable of all configurations for the experiment."""
+        return it.product(*self._params.values())
+
+    @staticmethod
+    def _err(exception):
+        """
+        Error callback for multiprocessing.
+
+        This function 'handles' exceptions from Processes by displaying them.
+        The run_config_wrapped() function puts tracebacks into the
+        exceptions, so that printing them here is actually meaningful.
+        :param exception: The exception thrown by run_config()
+        """
+        print(exception)
+
+    def _cb(self, retval):
         """
         Receives callbacks from multiprocessing.
 
@@ -87,11 +80,12 @@ class Experiment:
         :param retval: Value returned by run_config().
         :return:
         """
-        self.completed += 1
-        print('Completed %d/%d.' % (self.completed, self.num_configs))
-        self.task_callback(retval)
+        self.__completed += 1
+        if not self._silent:
+            print('Completed %d/%d.' % (self.__completed, self.__num_configs))
+        self.result(retval)
 
-    def run_task_wrapped(self, configuration):
+    def _wrapper(self, configuration):
         """
         Provides decent error handling in the multiprocessing module.
 
@@ -104,11 +98,11 @@ class Experiment:
         :return: Return from run_config()
         """
         try:
-            return self.run_task(configuration)
+            return self.task(configuration)
         except Exception:
             raise Exception("".join(traceback.format_exc()))
 
-    def run_experiment_multiprocessing(self, processes=None):
+    def __run_mp(self, processes=None):
         """
         Runs the experiment using the multiprocessing module.
 
@@ -123,20 +117,40 @@ class Experiment:
         :return: Blocks until all tasks are complete.  Returns nothing.
         """
         # Setup the class variables used during the experiment.
-        self.completed = 0
-
-        # Create all possible configurations (an iterator).
-        configs = it.product(*self.params.values())
+        self.__completed = 0
 
         # Create a multiprocessing pool and add each configuration task.
         resultobjs = []
         with mp.Pool(processes=processes) as pool:
-            for configuration in configs:
-                resultobjs.append(pool.apply_async(self.run_task_wrapped,
-                    (configuration,), callback=self.initial_task_callback,
-                    error_callback=self.error_callback))
-                self.num_configs += 1
-            print('Experiment: queued %d tasks.' % self.num_configs)
+            for configuration in self.configs():
+                resultobjs.append(pool.apply_async(self._wrapper,
+                                                   (configuration,),
+                                                   callback=self._cb,
+                                                   error_callback=self._err))
+                self.__num_configs += 1
+            if not self._silent:
+                print('Experiment: queued %d tasks.' % self.__num_configs)
             for result in resultobjs:
                 result.wait()
+            if not self._silent:
+                print('Experiment: completed all tasks.')
+
+    def __run_serial(self):
+        """Runs the experiment in serial."""
+        self.__completed = 0
+        for config in self.configs():
+            try:
+                self.result(self.task(config))
+                self.__completed += 1
+            except:
+                print("".join(traceback.format_exc()))
+            if not self._silent:
+                print('Experiment: completed %d tasks.' % self.__completed)
+        if not self._silent:
             print('Experiment: completed all tasks.')
+
+    def run(self, mp=True, nproc=None):
+        if mp:
+            self.__run_mp(processes=nproc)
+        else:
+            self.__run_serial()

@@ -9,6 +9,7 @@ from tcga import compare
 
 
 class TestEntropy(unittest.TestCase):
+    """Tests the `tcga.compare._entropy()` function."""
 
     def test_trivial_zero_case(self):
         """Tests homogeneous data where _entropy is zero."""
@@ -37,6 +38,7 @@ class TestEntropy(unittest.TestCase):
 
 
 class TestMutualInfo(unittest.TestCase):
+    """Tests the `tcga.compare.mutual_info()` function."""
 
     def test_trivial_one_case(self):
         """Tests the trivial case when one dataset is determined by another."""
