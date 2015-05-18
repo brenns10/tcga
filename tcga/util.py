@@ -381,39 +381,3 @@ class Menu:
             self.add(name, f)
             return f
         return decorator
-
-
-class CallableExceptionWrapper(object):
-    """
-    A class that wraps a function, catches all exceptions produced by it,
-    and re-throws them with their stack trace.
-
-    This class is only really useful with the 'multiprocessing' module.
-    Exceptions returned by other processes are rarely useful, because they
-    contain no stack trace, and rarely do they contain much other useful
-    info.  In order to debug your processes, you need these things.  If you
-    attempt to create a wrapper function (via a closure) to catch exceptions,
-    you get an error from the 'pickle' module because you can't pickle function
-    closures.  So this class acts like you would use a function closure,
-    but instead stores the 'closure' values in the class's state.
-    """
-    def __init__(self, func):
-        """
-        Create a wrapper for a function to catch exceptions.
-        :param func: The function to wrap.
-        :return: A callable class that accepts the same parameters as the
-        function.
-        """
-        self.func = func
-
-    def __call__(self, *args, **kwargs):
-        """
-        Execute the wrapped function.
-        :param args: Positional arguments for the function.
-        :param kwargs: Keyword arguments for the function.
-        :return: Return value of the function.
-        """
-        try:
-            return self.func(*args, **kwargs)
-        except Exception:
-            raise Exception("".join(traceback.format_exc()))
