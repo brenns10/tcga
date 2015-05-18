@@ -16,27 +16,32 @@ class DetectionExperiment(Experiment):
     """
     Encapsulates an experiment on how detectable functions are.
 
+    **Task**
+    
+    The configuration task attempts to identify a pattern that has been put
+    into a random dataset.  It does this self.TRIALS_PER_CONFIG times for
+    each function.  It returns information about false positives and
+    negatives, and about the mutual information.
+
     In the DetectionExperiment, a configuration is a value for:
     - Sample Size (number of items in dataset)
     - Sparsity (P(1) in each dataset)
     - Pattern Density (% of phenotype items to overwrite with pattern value)
-    The configuration task attempts to reclaim an imprinted pattern
-    self.TRIALS_PER_CONFIG times for each function.  It returns information
-    about false positives and negatives, and about the mutual information.
     """
 
     def __init__(self):
         """
         Set up a detection experiment with default values.
         """
-        self.params['Sample Size'] = [500, 1000, 1500]
-        self.params['Sparsity'] = np.arange(0.05, 0.51, 0.05)
-        self.params['Pattern Density'] = np.arange(0.3, 0.0, -0.01)
+        super().__init__()
+        self._params['Sample Size'] = [500, 1000, 1500]
+        self._params['Sparsity'] = np.arange(0.05, 0.51, 0.05)
+        self._params['Pattern Density'] = np.arange(0.3, 0.0, -0.01)
         self.TRIALS_PER_CONFIG = 50
         self.results = []
 
         # Define the column for the detection dataset.
-        detection_columns = list(self.params.keys())
+        detection_columns = list(self._params.keys())
         for function in compare.COMBINATIONS:
             detection_columns.append(function.__name__ + '_implant')
             detection_columns.append(function.__name__ + '_ident')
@@ -45,7 +50,7 @@ class DetectionExperiment(Experiment):
         self.results.append(DataFrame(columns=detection_columns))
 
         # Define the columns for the mutual information dataset.
-        mi_columns = list(self.params.keys())
+        mi_columns = list(self._params.keys())
         mi_columns.append('Implanted')
         mi_columns.append('Trials')
         mi_columns.append('joint_mean')
@@ -56,13 +61,13 @@ class DetectionExperiment(Experiment):
 
         self.results.append(DataFrame(columns=mi_columns))
 
-    def task_callback(self, retval):
+    def result(self, retval):
         for row_list, dataframe in zip(retval, self.results):
             for row in row_list:
                 self._dataframe_append(dataframe, row)
 
     @staticmethod
-    def run_trial(configuration, function):
+    def trial(configuration, function):
         """
         Run a single trial of the configuration task, with the given function.
 
@@ -108,7 +113,7 @@ class DetectionExperiment(Experiment):
                                                 ds1domain=4)
         return mutual_info, max_f, joint_mutual_info
 
-    def run_task(self, configuration):
+    def task(self, configuration):
         """
         Run a single configuration.
         :param configuration: The configuration parameters.
@@ -173,19 +178,19 @@ class DetectionExperiment(Experiment):
         # Return our detection row and mutual information rows.
         return [detection_row], mi_rows
 
-    def save(self, savedir='.', filenames=None):
+    def save(self, save_dir='.', filenames=None):
         """
-        Picle the result data frames.  Stores all files in savedir.  They can be
-        given custom filenames, or saved as 'resultN.pickle'.
-        :param savedir: Directory to save in.
+        Pickle the result data frames.  Stores all files in save_dir.  They
+        can be given custom filenames, or saved as 'resultN.pickle'.
+        :param save_dir: Directory to save in.
         :param filenames: File names for each result DataFrame.
         """
         if filenames is None:
             filenames = ['result%d.pickle' % i for i in range(len(self.results))]
 
-        savedir = os.path.expandvars(os.path.expanduser(savedir))
+        save_dir = os.path.expandvars(os.path.expanduser(save_dir))
         for filename, result in zip(filenames, self.results):
-            result.to_pickle(os.path.join(savedir, filename))
+            result.to_pickle(os.path.join(save_dir, filename))
 
 
 def _heatmap(subset, function_name, x_field, y_field,
