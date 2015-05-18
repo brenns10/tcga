@@ -122,10 +122,10 @@ class PermutationTest(Experiment):
 
         # This experiment is simply repeated for many trials.  No parameters
         # are varying.
-        self.params['Trial'] = range(trials)
+        self._params['Trial'] = range(trials)
         self.trials = trials
 
-    def run_task(self, config):
+    def task(self, config):
         """
         Task that is repeated for each trial.
 
@@ -148,7 +148,7 @@ class PermutationTest(Experiment):
         values.sort(reverse=True)
         return values[:self.ranks]
 
-    def task_callback(self, retval):
+    def result(self, retval):
         """
         Store the data from the task.  Executed on main process.
         :param retval: Return value from run_task().
