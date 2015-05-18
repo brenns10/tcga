@@ -14,7 +14,7 @@ from there.
 Finally, this module makes the assumption that loading pickled data is
 better than parsing data.  So, it provides functions that access each type
 of data, first by looking for a pickled copy, and then by parsing it and
-pickling it, if the piclked copy did not exist.
+pickling it, if the pickled copy did not exist.
 """
 
 import csv
