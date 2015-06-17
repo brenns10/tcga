@@ -11,67 +11,7 @@ Additionally, this module contains the logic functions used for bool Series.
 import numpy as np
 from lifelines.statistics import logrank_test
 
-
-def _entropy(ds, domain=(0, 1)):
-    """
-    Computes the _entropy (in bits) of a dataset.
-
-    :param Series ds: The dataset to compute the _entropy of.
-    :param iterable domain: The domain of the dataset.
-    :return: The _entropy of the dataset, in bits.
-    :rtype: float
-    """
-    curr_entropy = 0
-    total = len(ds)
-    for value in domain:
-        probability = len(ds[ds == value]) / total
-        if probability != 0:  # avoid log(0)
-            curr_entropy -= probability * np.log2(probability)
-    return curr_entropy
-
-
-def _conditional_entropy(ds, cs, ds_domain=(0, 1), cs_domain=(0, 1)):
-    """
-    Computes the conditional _entropy of ds given cs, AKA H(ds|cs), in bits.
-
-    :param Series ds: The non-conditioned dataset (eg. X in H(X|Y)).
-    :param Series cs: The conditioned dataset. (eg. Y in H(X|Y)).
-    :param iterable ds_domain: The domain of the non-conditioned dataset.
-    :param iterable cs_domain: The domain of the conditioned dataset.
-    :return: The conditional _entropy of ds given cs, AKA H(ds|cs), in bits.
-    :rtype: float
-    """
-    curr_entropy = 0
-    total = len(ds)
-    for d in ds_domain:
-        for c in cs_domain:
-            p_both = len(ds[(ds == d) & (cs == c)]) / total
-            p_condition = len(cs[cs == c]) / total
-            if p_both != 0:
-                curr_entropy += p_both * np.log2(p_condition / p_both)
-    return curr_entropy
-
-
-def mutual_info(ds1, ds2, ds1domain=2, ds2domain=2):
-    """
-    Calculate the mutual information between two datasets.
-
-    This objective function is the mutual information between two boolean
-    datasets.  This is a measure of similarity.
-
-    :param Series ds1: First dataset.
-    :param Series ds2: Second dataset.
-    :param int ds1domain: Domain of first dataset: x is in [0, ds1domain) for
-    all x in ds1.
-    :param int ds2domain: Domain of second dataset: x is in [0, ds2domain)
-    for all x in ds1.
-    :return: The mutual information between the two datasets.
-    :rtype: float
-    """
-    combined = ds1 + ds2 * ds1domain
-    return (_entropy(ds1, domain=range(ds1domain)) +
-            _entropy(ds2, domain=range(ds2domain)) -
-            _entropy(combined, domain=range(ds1domain * ds2domain)))
+from smbio.math.information import mutual_info
 
 
 def log_rank(dataset, phenotype):

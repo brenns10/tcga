@@ -1,6 +1,5 @@
 """Contains the DetectionExperiment class and related analysis functions."""
 
-import itertools as it
 import os.path
 import random
 
@@ -8,8 +7,10 @@ from matplotlib import pyplot as plt
 import numpy as np
 from pandas import DataFrame, Series
 
-from . import compare
-from .experiment import Experiment
+from tcga import compare
+from tcga.util import dataframe_append
+from smbio.experiment import Experiment
+import smbio.math.information as info
 
 
 class DetectionExperiment(Experiment):
@@ -17,7 +18,7 @@ class DetectionExperiment(Experiment):
     Encapsulates an experiment on how detectable functions are.
 
     **Task**
-    
+
     The configuration task attempts to identify a pattern that has been put
     into a random dataset.  It does this self.TRIALS_PER_CONFIG times for
     each function.  It returns information about false positives and
@@ -29,45 +30,28 @@ class DetectionExperiment(Experiment):
     - Pattern Density (% of phenotype items to overwrite with pattern value)
     """
 
-    def __init__(self):
+    def __init__(self, function):
         """
         Set up a detection experiment with default values.
         """
         super().__init__()
+        self.function = function
         self._params['Sample Size'] = [500, 1000, 1500]
         self._params['Sparsity'] = np.arange(0.05, 0.51, 0.05)
         self._params['Pattern Density'] = np.arange(0.3, 0.0, -0.01)
-        self.TRIALS_PER_CONFIG = 50
-        self.results = []
-
-        # Define the column for the detection dataset.
         detection_columns = list(self._params.keys())
-        for function in compare.COMBINATIONS:
-            detection_columns.append(function.__name__ + '_implant')
-            detection_columns.append(function.__name__ + '_ident')
-            detection_columns.append(function.__name__ + '_guess')
-
-        self.results.append(DataFrame(columns=detection_columns))
-
-        # Define the columns for the mutual information dataset.
-        mi_columns = list(self._params.keys())
-        mi_columns.append('Implanted')
-        mi_columns.append('Trials')
-        mi_columns.append('joint_mean')
-        mi_columns.append('joint_std')
-        for function in compare.COMBINATIONS:
-            mi_columns.append(function.__name__ + '_mean')
-            mi_columns.append(function.__name__ + '_std')
-
-        self.results.append(DataFrame(columns=mi_columns))
+        self._params['Trials'] = [50]
+        self._params['Function'] = [function]
+        detection_columns += list(c.__name__ for c in compare.COMBINATIONS)
+        detection_columns.append('joint')
+        self.results = DataFrame(columns=detection_columns)
 
     def result(self, retval):
-        for row_list, dataframe in zip(retval, self.results):
-            for row in row_list:
-                self._dataframe_append(dataframe, row)
+        for result in retval:
+            dataframe_append(self.results, result)
 
     @staticmethod
-    def trial(configuration, function):
+    def task(configuration):
         """
         Run a single trial of the configuration task, with the given function.
 
@@ -83,114 +67,50 @@ class DetectionExperiment(Experiment):
           [2]: The mutual information etween the joint distribution and the
           phenotype.
         """
-        sample_size, sparsity, pattern_density = configuration
+        sample_size, sparsity, pattern_density, trial, function = configuration
+        results = []
 
-        # Create three random datasets:
-        ds1 = binary_distribution(sample_size, sparsity)
-        ds2 = binary_distribution(sample_size, sparsity)
-        phen = binary_distribution(sample_size, sparsity)
+        for _ in range(trial):
+            res = {'Sample Size': sample_size, 'Sparsity': sparsity,
+                   'Pattern Density': pattern_density}
+            # Create three random datasets:
+            ds1 = binary_distribution(sample_size, sparsity)
+            ds2 = binary_distribution(sample_size, sparsity)
+            phen = binary_distribution(sample_size, sparsity)
 
-        # Compute f(ds1, ds2) for each function f.
-        combinations = {f: f(ds1, ds2) for f in compare.COMBINATIONS}
+            # Compute f(ds1, ds2) for each function f.
+            combinations = {f: f(ds1, ds2) for f in compare.COMBINATIONS}
 
-        # Implant the pattern of function in a proportion of the phenotype.
-        amount_to_implant = int(sample_size * pattern_density)
-        for i in random.sample(range(sample_size), amount_to_implant):
-            phen[i] = combinations[function][i]
+            # Implant the pattern of function in a proportion of the phenotype.
+            amount_to_implant = int(sample_size * pattern_density)
+            implant_indices = random.sample(range(sample_size),
+                                            amount_to_implant)
+            phen[implant_indices] = combinations[function][implant_indices]
 
-        # Calculate mutual information between function values
-        mutual_info = {}
-        for func, comb in combinations.items():
-            mutual_info[func] = compare.mutual_info(comb, phen)
+            # Calculate mutual information between function values
+            phen_entropy = info.entropy(phen)
+            for func, comb in combinations.items():
+                res[func.__name__] = info.mutual_info_fast(comb, phen,
+                                                           info.entropy(comb),
+                                                           phen_entropy)
 
-        # Select the best function based on mutual info.
-        max_f = max(mutual_info.keys(), key=lambda k: mutual_info[k])
+                # Calculate the mutual information of the joint distribution
+                # and the phenotype.
+                joint = info.joint_dataset(ds1, ds2)
+                res['joint'] = info.mutual_info_fast(joint, phen,
+                                                     info.entropy(joint),
+                                                     phen_entropy)
+            results.append(res)
+        return results
 
-        # Calculate the mutual information of the joint distribution and the
-        # phenotype.
-        joint_distribution = ds1 + 2*ds2
-        joint_mutual_info = compare.mutual_info(joint_distribution, phen,
-                                                ds1domain=4)
-        return mutual_info, max_f, joint_mutual_info
-
-    def task(self, configuration):
-        """
-        Run a single configuration.
-        :param configuration: The configuration parameters.
-        :return: Tuple:
-         [0]: dict: Row to add to the detection dataset.
-         [1]: list of dict: Rows to add to the mutual information dataset.
-        """
-        # Setup result dictionaries
-        implant = {f: 0 for f in compare.COMBINATIONS}
-        ident = {f: 0 for f in compare.COMBINATIONS}
-        guess = {f: 0 for f in compare.COMBINATIONS}
-        mi_rows = []
-
-        for func in compare.COMBINATIONS:
-            mutual_infos = {f: [] for f in compare.COMBINATIONS}
-            joint_mis = []
-
-            for _ in range(self.TRIALS_PER_CONFIG):
-                # Run the trial
-                midict, res_func, joint_mi = self.run_trial(configuration, func)
-
-                # Record stats about recovery
-                implant[func] += 1
-                if func == res_func:
-                    ident[func] += 1
-                guess[res_func] += 1
-
-                # Record the mutual information
-                for f, mi in midict.items():
-                    mutual_infos[f].append(mi)
-                joint_mis.append(joint_mi)
-
-            # Generate the mutual information row for this configuration and
-            # function.
-            mi_row = {
-                'Sample Size': configuration[0],
-                'Sparsity': configuration[1],
-                'Pattern Density': configuration[2],
-                'Implanted': func.__name__,
-                'Trials': self.TRIALS_PER_CONFIG,
-                'joint_mean': np.mean(joint_mis),
-                'joint_std': np.std(joint_mis),
-            }
-            for f, milist in midict.items():
-                mi_row[f.__name__ + '_mean'] = np.mean(milist)
-                mi_row[f.__name__ + '_std'] = np.std(milist)
-
-            # Add the row to the list of mutual information rows to return.
-            mi_rows.append(mi_row)
-
-        # Generate the detection data row for this configuration.
-        detection_row = {
-            'Sample Size': configuration[0],
-            'Sparsity': configuration[1],
-            'Pattern Density': configuration[2]
-        }
-        for func in compare.COMBINATIONS:
-            detection_row[func.__name__ + '_implant'] = implant[func]
-            detection_row[func.__name__ + '_ident'] = ident[func]
-            detection_row[func.__name__ + '_guess'] = guess[func]
-
-        # Return our detection row and mutual information rows.
-        return [detection_row], mi_rows
-
-    def save(self, save_dir='.', filenames=None):
+    def save(self, filename='result.pickle'):
         """
         Pickle the result data frames.  Stores all files in save_dir.  They
         can be given custom filenames, or saved as 'resultN.pickle'.
         :param save_dir: Directory to save in.
         :param filenames: File names for each result DataFrame.
         """
-        if filenames is None:
-            filenames = ['result%d.pickle' % i for i in range(len(self.results))]
-
-        save_dir = os.path.expandvars(os.path.expanduser(save_dir))
-        for filename, result in zip(filenames, self.results):
-            result.to_pickle(os.path.join(save_dir, filename))
+        self.results.to_pickle(filename)
 
 
 def _heatmap(subset, function_name, x_field, y_field,
@@ -359,7 +279,6 @@ def plot_detection_comparison(dataframe, sample_size, cutoff=0.8):
 
 def plot_mi_comparison(dataframe, func_name, sample_size, sparsity):
     subset = dataframe[dataframe['Sample Size'] == sample_size]
-    subset = subset[subset['Implanted'] == func_name]
     subset = subset[subset['Sparsity'] == sparsity]
     subset = subset.sort('Pattern Density')
     fig = plt.figure()
@@ -378,16 +297,6 @@ def plot_mi_comparison(dataframe, func_name, sample_size, sparsity):
                    (func_name, sample_size, sparsity))
     plot.legend(loc='upper left')
     return fig
-
-
-def plot_all_mi_comparisons(dataframe, dir='.', format='svg'):
-    fnames = [f.__name__ for f in compare.COMBINATIONS]
-    ssizes = set(dataframe['Sample Size'])
-    sparsities = set(dataframe['Sparsity'])
-    for fname, ssize, sparsity in it.product(fnames, ssizes, sparsities):
-        fig = plot_mi_comparison(dataframe, fname, ssize, sparsity)
-        filename = '%d_%.2f_%s.%s' % (ssize, sparsity, fname, format)
-        fig.savefig(os.path.join(dir, filename), format=format)
 
 
 def binary_distribution(size, sparsity):
