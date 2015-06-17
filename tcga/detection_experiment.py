@@ -277,26 +277,27 @@ def plot_detection_comparison(dataframe, sample_size, cutoff=0.8):
     return fig
 
 
-def plot_mi_comparison(dataframe, func_name, sample_size, sparsity):
-    subset = dataframe[dataframe['Sample Size'] == sample_size]
-    subset = subset[subset['Sparsity'] == sparsity]
-    subset = subset.sort('Pattern Density')
-    fig = plt.figure()
-    plot = fig.add_subplot(111)
-    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'w']
-    for function, color in zip(compare.COMBINATIONS, colors):
-        colname = function.__name__ + '_mean'
-        plot.plot(subset['Pattern Density'], subset[colname], color + '-',
-                  label=function.__name__)
-    plot.plot(subset['Pattern Density'], subset['joint_mean'], 'k-',
-              label='joint_mean')
-    plot.set_xlabel('Pattern Density')
-    plot.set_ylabel('Mean Mutual Information with Phenotype (200 trials)')
-    plot.set_title('Mutual Information by Pattern Density of %s for Various '
-                   'Functions\nSample Size=%d, Sparsity=%.2f' %
-                   (func_name, sample_size, sparsity))
-    plot.legend(loc='upper left')
+def plot_mi_comparison(df, sample_size, sparsity, title):
+    subset = df[(df['Sample Size'] == sample_size) &
+                (df['Sparsity'] == sparsity)]
+    subset.drop(['Sample Size', 'Sparsity'], axis=1, inplace=True)
+    means = subset.groupby('Pattern Density').mean()
+    ax = means.plot()
+    fig = ax.get_figure()
+    ax.set_title(title)
+    ax.set_ylabel('Mutual Information (bits)')
     return fig
+
+
+def plot_all_mi(df, function_name):
+    title = 'Pattern Recognition of %s, Sample Size %d, Sparsity %f'
+    for sample_size in df['Sample Size'].unique():
+        for sparsity in df['Sparsity'].unique():
+            fig = plot_mi_comparison(df, sample_size, sparsity,
+                                     title % (function_name, sample_size,
+                                              sparsity))
+            fig.savefig('%s_%d_%f.png' % (function_name, sample_size,
+                                          sparsity))
 
 
 def binary_distribution(size, sparsity):
