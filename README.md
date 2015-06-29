@@ -4,32 +4,29 @@ TCGA Data Analysis Package
 Summary
 -------
 
-This package implements an algorithm which uses existing biological knowledge
-to assist in determining the best binary function of somatic mutations to 
-explain a phenotype variable.  The existing biological knowledge is presented
-in a binary DAG form of a gene ontology.  
-
-The package allows for using a variety of phenotypes and objective functions 
-to guide the search.  The currently implemented choices are:
-
-* Patient lifetime as a phenotype, using the log rank test for the objective 
-  function.
-* Any binary phenotype (e.g. vital status), using mutual information as the 
-  objective function.
-  
-More phenotypes and objective functions may be added readily, 
-as discussed below.
+This package implements an algorithm for inference of Boolean functions of
+somatic mutations that correlate with phenotypes.  It uses mutual information as
+an objective function, and uses the Gene Ontology (as a binary tree) to
+structure and limit the search space for Boolean functions.
 
 Project Technologies and Dependencies
 -------------------------------------
 
 * Python 3
-* [Pandas](https://pypi.python.org/pypi/pandas)
-* [NumPy](https://pypi.python.org/pypi/numpy)
-* [SymPy](https://pypi.python.org/pypi/sympy) (to present symbolic 
-  representations of binary functions)
-* [NetworkX](https://pypi.python.org/pypi/networkx) (to store the binary DAG)
-* [Lifelines](https://pypi.python.org/pypi/lifelines) (for log rank test)
+* [smbio](http://singularity.case.edu/sbrennan/smbio) (also on
+  [GitHub](https://github.com/brenns10/smbio)): a library containing helpful,
+  reusable bioinformatics code for Python.
+* [Pandas](https://pypi.python.org/pypi/pandas): a library for loading, saving,
+  manipulating, and querying large numeric datasets quickly in Python.
+* [NumPy](https://pypi.python.org/pypi/numpy): a library for performing numeric
+  computations in Python.
+* [SymPy](https://pypi.python.org/pypi/sympy): a library for manipulation of
+  symbolic representations of math formulae in Python.  Used only for outputting
+  a "pretty" representation of result functions.
+* [NetworkX](https://pypi.python.org/pypi/networkx): a library for manipulation
+  of graphs in Python.
+* [Lifelines](https://pypi.python.org/pypi/lifelines) a library for computing
+  log-rank test statistics in Python.  This will likely be removed soon.
 
 Structure
 ---------
@@ -41,9 +38,8 @@ The framework of the pattern recovery algorithm is contained within the modules:
 * `tcga.pattern`: This module contains the actual implementation of the 
   pattern recovery algorithm.  Its only function is
   `tcga.pattern.dag_pattern_recover()`.
-* `tcga.compare`: Contains objective functions for the pattern recovery 
-  algorithm.  New objective functions should be modeled after those in this 
-  package.
+* `tcga.compare`: Contains objective functions and implementations of the
+  boolean functions.
 
 ### Utilities
 
@@ -57,32 +53,13 @@ The next group of packages simplify working with the framework.
   (refer to data on the filesystem by a title, rather than full file path).
   See its documentation for more details.
 * `tcga.tree`: This module provides convenient functions for examining the 
-  DAG, after it has been modified by `dag_pattern_recover()`.
+DAG, after it has been modified by `dag_pattern_recover()`.
 
 ### Experiments
 
-In order to learn about the algorithm, and to use it on real data, 
-an experiment abstraction is provided.  The abstraction allows for tasks to 
-be repeated over many configurations.  Experiments created using this 
-abstraction may be run concurrently using the Python standard 
-library `multiprocessing` module, allowing for huge performance gains on 
-multi-core systems.
-
-The `Experiment` abstraction is provided in the `experiment` module.  
-Existing experiments are implemented in `detection_experiment` and 
-`permutation_test`.
-
-### Miscellaneous
-
-Before the existence of the Experiment abstraction, this module had a command
-line interface (`run.py`) to streamline running tests.  However, 
-experiments are most easily run within an IPython shell.  The CLI may be 
-removed in the future (it is empty currently).
-
-The CLI made heavy use of utilities in the `util` module.  Many of them are 
-useful for creating the actual command line interface, and have nothing to do
-with the pattern recovery algorithm itself.  These utilities may also be 
-removed, or extracted into their own library.
+The `smbio` library provides a multiprocessing base class for running
+experiments.  This package contains a few modules that extend this class, in
+order to perform permutation tests.
 
 Info
 ----
