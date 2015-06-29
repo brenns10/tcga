@@ -1,11 +1,20 @@
 """Simulation experiment for pattern recovery at scale."""
 
-from util import binary_distribution
-from pattern import dag_pattern_recover
+import pandas as pd
+
+from tcga.util import binary_distribution
+from tcga.pattern import dag_pattern_recover
 
 
 def random_mutations(samples, sparsity, genes):
-    pass
+    df = pd.DataFrame()
+    sl = ['sample_%d' % n for n in range(samples)]
+    for x in range(genes):
+        s = binary_distribution(samples, sparsity)
+        s.index = sl
+        s.name = 'gene_%d' % x
+        df['gene_%d' % x] = s
+    return df
 
 
 def create_ontology(genes):
