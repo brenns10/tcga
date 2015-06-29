@@ -5,10 +5,9 @@ import random
 
 from matplotlib import pyplot as plt
 import numpy as np
-from pandas import DataFrame, Series
 
 from tcga import compare
-from tcga.util import dataframe_append
+from tcga.util import dataframe_append, binary_distribution
 from smbio.experiment import Experiment
 import smbio.math.information as info
 
@@ -298,17 +297,3 @@ def plot_all_mi(df, function_name):
                                               sparsity))
             fig.savefig('%s_%d_%f.png' % (function_name, sample_size,
                                           sparsity))
-
-
-def binary_distribution(size, sparsity):
-    """
-    Generate a boolean dataset of a particular size specified probability.
-
-    :param size: The number of items in the dataset.
-    :param sparsity: The probability of a 1/True.
-    :return: A Series of bools randomly generated with the given parameters.
-    """
-    ds = Series(np.random.ranf(size))
-    ds[ds < sparsity] = 1
-    ds[ds != 1] = 0
-    return ds.astype(bool)

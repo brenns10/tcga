@@ -3,19 +3,20 @@
 
 from os.path import expandvars, expanduser
 
-from tcga import parse, util
+from tcga import parse
+from smbio.util.menu import Menu, repeat_input
 
 
-main = util.Menu(title='TCGA Procedures', reentrant=True)
+main = Menu(title='TCGA Procedures', reentrant=True)
 state = {'muts': None, 'phen': None}
 
 
 def check_save(data):
     """Ask if the user would like to save a CSV."""
-    response = util.repeat_input('Save? ', str)
+    response = repeat_input('Save? ', str)
     if response.lower() not in ['y', 'yes', 'true', 't']:
         return
-    location = util.repeat_input('Location: ', str)
+    location = repeat_input('Location: ', str)
     location = expandvars(expanduser(location))
     data.to_csv(location)
 
