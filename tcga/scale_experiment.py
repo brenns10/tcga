@@ -18,7 +18,7 @@ def random_mutations(samples, sparsity, genes):
 
 
 def create_ontology(genes):
-    pass
+    
 
 
 def create_function(genes, ontology):
