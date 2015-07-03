@@ -8,6 +8,7 @@ import networkx as nx
 
 from tcga.util import binary_distribution
 from tcga.pattern import dag_pattern_recover
+from tcga.compare import COMBINATIONS
 
 
 def random_mutations(samples, sparsity, genes):
@@ -46,6 +47,7 @@ def create_ontology(genes):
     for gene in genes:
         digraph = nx.DiGraph
         digraph.add_node(gene)
+        digraph.node[gene]['successors'] = 1
         trees.append((gene, digraph))
 
     # Combine trees into a single binary tree.
@@ -67,22 +69,37 @@ def create_ontology(genes):
         lhs_tree.add_node(new_root)
         lhs_tree.add_edge(new_root, lhs_root)
         lhs_tree.add_edge(new_root, rhs_root)
+        lhs_tree.nodes[new_root]['successors'] = (
+            lhs_tree.nodes[lhs_root]['successors'] +
+            lhs_tree.nodes[rhs_root]['successors']
+        )
 
         # Add to the end of the queue
         trees.append((new_root, lhs_tree))
     return trees.pop()[1]
 
 
-def create_function(genes, ontology, num_genes=4):
+def create_function(genes, G, num_genes=4):
     """
     Create a function using the gene ontology.
     """
-    function_genes = random.sample(genes, num_genes)
-    # TODO - randomly create a function that follows the ontology!
+    terms = [n for n in G if G.node[n]['successors'] == num_genes]
+    term = random.choice(terms)
+    q = collections.deque([term])
+    nodes = set()
+    while q:
+        n = q.popleft()
+        nodes.add(n)
+        q.extend(n.successors())
+    SG = G.subgraph(nodes).copy()
+    for node in SG:
+        if SG.out_degree(node) != 2:
+            SG.nodes[node]['function'] = random.choice(COMBINATIONS)
+    return SG
 
 
 def implant_pattern(genes, phenotype, function):
-    pass
+    pattern = 
 
 
 def simulation(samples=500, sparsity=0.5, genes=1000):
